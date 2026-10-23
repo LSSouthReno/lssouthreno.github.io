@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- BETA SITE ONLY. scripts/stage.sh adds this to the beta copy; it is never in the live site. -->
+<meta name="robots" content="noindex,nofollow">
+<script>
+(function(){
+  // The beta site reads the LIVE data files from lssouthreno.com (the backend only updates
+  // those), so beta always shows today's real numbers. Everything else (the page code) is beta.
+  var LIVE = 'https://lssouthreno.com', DATA = ["absences.json", "appsscript.json", "dashboard-data.json", "eos-data.json", "ids_log.json", "joy_bombs.json", "pathway.json", "shepherding-data.json"];
+  var real = window.fetch;
+  window.fetch = function(input, init){
+    try {
+      var u = new URL(typeof input === 'string' ? input : input.url, location.href);
+      var file = u.pathname.replace(/^\//, '');
+      if (u.origin === location.origin && DATA.indexOf(file) !== -1) input = LIVE + u.pathname + u.search;
+    } catch(e) {}
+    return real.call(this, input, init);
+  };
+  window.LSSR_BETA = {"commit":"414b7661","built":"20261023T152917Z","live":"https://lssouthreno.com"};
+  function ribbon(){
+    if (document.getElementById('lssrBetaRibbon') || window.top !== window) return;   // one ribbon, not one per embedded frame
+    var d = document.createElement('div');
+    d.id = 'lssrBetaRibbon';
+    d.innerHTML = 'BETA &middot; test site &middot; edits still save to the real data';
+    d.title = 'Beta build ' + (window.LSSR_BETA.commit || '') + ' (' + (window.LSSR_BETA.built || '') + '). The live site is lssouthreno.com.';
+    d.style.cssText = 'position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:2147483000;background:#7c3aed;color:#fff;font:700 11px/1 Montserrat,system-ui,sans-serif;letter-spacing:.08em;padding:5px 12px;border-radius:0 0 8px 8px;pointer-events:none;box-shadow:0 2px 10px rgba(0,0,0,.4);white-space:nowrap';
+    document.body.appendChild(d);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ribbon); else ribbon();
+})();
+</script>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#141414">
+<title>Creative Projects</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#141414; --card:#1f1f1f; --border:#2c2c2c; --text:#f3efe6; --muted:#a39e94; --dim:#6f6a62; --gold:#d4af37; --gold-soft:rgba(212,175,55,.13); --green:#22c55e; --red:#ef4444; --orange:#f97316; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:'Montserrat',-apple-system,sans-serif; padding:env(safe-area-inset-top) 0 40px; }
+  .wrap { max-width:760px; margin:0 auto; padding:20px 16px; }
+  h1 { font-family:'Bebas Neue',sans-serif; font-weight:400; letter-spacing:2px; font-size:40px; margin:0; color:var(--gold); }
+  .sub { color:var(--muted); font-size:13px; margin:2px 0 18px; }
+  .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:18px; }
+  .stat { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:12px 6px; text-align:center; }
+  .stat b { display:block; font-size:26px; font-weight:800; }
+  .stat span { font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--muted); }
+  .stat.od b { color:var(--red); } .stat.wk b { color:var(--gold); } .stat.dn b { color:var(--green); }
+  .item { background:var(--card); border:1px solid var(--border); border-left:4px solid var(--dim); border-radius:10px; padding:12px 14px; margin-bottom:8px; display:flex; gap:12px; align-items:flex-start; }
+  .item.high { border-left-color:var(--orange); } .item.low { border-left-color:#3b82f6; }
+  .item.over { border-left-color:var(--red); background:rgba(239,68,68,.07); }
+  .item.done { opacity:.5; }
+  .item.done .ttl { text-decoration:line-through; }
+  .grip { flex:none; width:26px; align-self:stretch; margin:-6px 0 -6px -8px; display:flex; align-items:center; justify-content:center; color:var(--dim); font-size:20px; line-height:1; letter-spacing:-3px; cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none; border-radius:6px; }
+  .grip:hover, .grip:active { color:var(--gold); background:var(--gold-soft); }
+  .item.dragging { position:relative; z-index:5; opacity:.95; box-shadow:0 10px 26px rgba(0,0,0,.6); border-color:var(--gold); cursor:grabbing; transition:none; }
+  .item.dropabove { box-shadow:0 -3px 0 0 var(--gold); } .item.dropbelow { box-shadow:0 3px 0 0 var(--gold); }
+  body.reordering { user-select:none; -webkit-user-select:none; }
+  .pill.sent { background:rgba(239,68,68,.15); color:var(--red); } .pill.ok { background:rgba(34,197,94,.15); color:var(--green); }
+  .item.sentback { border-color:var(--red); }
+  .why { margin-top:6px; padding:8px 10px; border-left:3px solid var(--red); background:rgba(239,68,68,.07); border-radius:0 8px 8px 0; font-size:13px; overflow-wrap:anywhere; white-space:pre-wrap; }
+  .why small { display:block; color:var(--muted); font-size:11px; margin-top:4px; }
+  .acts button.rv { font-size:11px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; border:1px solid var(--border); border-radius:8px; }
+  .hint { color:var(--dim); font-size:11px; margin:-6px 0 8px; }
+  .chk { width:24px; height:24px; flex:none; margin-top:1px; accent-color:var(--green); cursor:pointer; }
+  .body { flex:1; min-width:0; }
+  .ttl { font-weight:600; font-size:15px; word-wrap:break-word; }
+  .meta { display:flex; flex-wrap:wrap; gap:6px 12px; margin-top:6px; font-size:12px; color:var(--muted); }
+  .pill { padding:1px 8px; border-radius:20px; font-size:10px; font-weight:700; letter-spacing:.8px; text-transform:uppercase; background:var(--gold-soft); color:var(--gold); }
+  .pill.high { background:rgba(249,115,22,.15); color:var(--orange); } .pill.low { background:rgba(59,130,246,.15); color:#93c5fd; }
+  .due.over { color:var(--red); font-weight:700; }
+  a.lk { color:var(--gold); text-decoration:underline; word-break:break-all; }
+  .acts { display:flex; gap:4px; flex:none; } .acts button { background:none; color:var(--muted); padding:4px 8px; font-size:15px; font-weight:400; }
+  .edit { display:grid; gap:8px; grid-template-columns:1fr 1fr; margin-top:8px; } .edit .full { grid-column:1/-1; } .edit .row { grid-column:1/-1; display:flex; gap:8px; }
+  .notes { margin-top:6px; overflow-wrap:anywhere; font-size:13px; color:var(--muted); white-space:pre-wrap; }
+  h2 { font-size:12px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin:22px 0 8px; display:flex; justify-content:space-between; cursor:default; }
+  h2.tog { cursor:pointer; }
+  .add { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:18px; display:grid; gap:8px; grid-template-columns:1fr 1fr; }
+  .add .full { grid-column:1/-1; }
+  input, select, textarea { background:#141414; color:var(--text); border:1px solid var(--border); border-radius:8px; padding:10px; font:inherit; font-size:14px; width:100%; }
+  input:focus, select:focus, textarea:focus { outline:none; border-color:var(--gold); }
+  button { background:var(--gold); color:#141414; border:0; border-radius:8px; padding:11px 16px; font:inherit; font-weight:700; font-size:14px; cursor:pointer; }
+  button.ghost { background:none; color:var(--muted); border:1px solid var(--border); font-weight:500; }
+  .login { max-width:320px; margin:80px auto; background:var(--card); border:1px solid var(--border); border-radius:12px; padding:22px; display:grid; gap:10px; text-align:center; }
+  .err { color:var(--red); font-size:13px; min-height:16px; }
+  .empty { color:var(--dim); text-align:center; padding:24px; }
+  .top { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+  .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--card); border:1px solid var(--gold); padding:10px 16px; border-radius:20px; font-size:13px; }
+  @media (max-width:480px) { .add { grid-template-columns:1fr; } h1 { font-size:34px; } }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><div class="empty">Loading…</div></div>
+<script>
+const STAFF_OS_URL = 'https://script.google.com/macros/s/AKfycbx-YDZg924fyFkG2U69o6Z0BBTLsh8ZAUvwK4fxSkW7LKGiXlxn5s2jyq9GCDxwA_sANA/exec';
+const OWNER = 'John Conelea';              // roster name of the person whose list this is
+const ADMINS = ['Brad Borowski', 'Ryan Griffin'];
+const ME_KEY = 'lssr_sos_me';              // shared with the dashboard: already signed in there = signed in here
+const GET_MAX = 1800;
+let editing = '', me = '', tasks = [], showDone = false, busy = 0, signinNeeded = false;
+// Manual priority order: a hidden record in the same shared store the staff dashboard reads (plans of type 'task_order'; detail = JSON list of task ids, top first),
+// so John's staff dashboard shows the same order. Tasks not in the list (new ones) go to the bottom.
+let order = [], orderRow = '', dragging = false, orderChain = Promise.resolve();
+const ORDER_KEY = 'lssr_creative_order';
+// Reviews (Ryan or Brad): a hidden plan record of type 'task_review' in the same shared store as the order, so no backend change is needed.
+// detail = JSON { taskId: { s:'sent_back'|'done', c:comment, b:reviewer, at:ms } }. The staff dashboard hides sent-back items from John's open list.
+let rev = {}, revRow = '', revChain = Promise.resolve(), sending = '';
+// Time needed: same trick, a hidden plan record of type 'task_time' (detail = JSON { taskId: 'Half day' }), so no sheet change is needed and old rows are untouched.
+let timeMap = {}, timeRow = '', timeChain = Promise.resolve();
+const TIMES = ['15 min', '30 min', '1 hour', '2 hours', 'Half day', 'Full day', 'Multiple days'];
+const timeOf = t => String((timeMap[t.id] || '')).trim();
+const isRev = () => ADMINS.includes(me);
+const isSent = t => !!(rev[t.id] && rev[t.id].s === 'sent_back') && String(t.status) !== 'done';
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+// Same transport the main dashboard uses: the fast staff API (Bearer = this device's staff sign-in) first, Apps Script as the backup.
+const FAST = 'https://api.lssouthreno.com';
+const tokenNow = () => { try { const t = localStorage.getItem('lssr_journey_token') || ''; return /^[0-9a-f]{64}$/.test(t) ? t : ''; } catch (e) { return ''; } };
+async function fast(path, body, ms) {
+  const tk = tokenNow(); if (!tk) return null;
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), ms || 8000);
+  try {
+    const init = { headers:{ Authorization:'Bearer ' + tk }, cache:'no-store', signal:ctl.signal };
+    if (body) { init.method = 'POST'; init.headers['Content-Type'] = 'application/json'; init.body = JSON.stringify(body); }
+    const r = await fetch(FAST + path, init);
+    if (r.status === 401) { signinNeeded = true; return null; }
+    if (r.status !== 200) return null;
+    const j = await r.json();
+    return j && j.for === (body ? body.action : 'sos_data') ? j : null;
+  } catch (e) { return null; } finally { clearTimeout(t); }
+}
+async function gasCall(body, tries) {
+  tries = tries || 3;
+  const b = Object.assign({}, body, { rid: body.rid || Date.now().toString(36) + Math.random().toString(36).slice(2, 10) });
+  const q = JSON.stringify(b);
+  const getUrl = STAFF_OS_URL + '?action=' + encodeURIComponent(b.action) + '&p=' + encodeURIComponent(q);
+  let viaGet = getUrl.length <= GET_MAX, last = null;
+  for (let i = 0; i < tries; i++) {
+    try {
+      const r = viaGet ? await fetch(getUrl + '&_=' + Date.now()) : await fetch(STAFF_OS_URL, { method:'POST', body:q });
+      if (viaGet && (r.status === 414 || r.status === 400)) viaGet = false;
+      const j = await r.json();
+      if (j && j.for === b.action) return j;
+      last = new Error('No reply');
+    } catch (e) { last = e; }
+    if (i + 1 < tries) await new Promise(res => setTimeout(res, 700 * (i + 1)));
+  }
+  throw last || new Error('No reply');
+}
+// Saves: one request id for both routes so a lost reply is never saved twice.
+function post(body) {
+  const b = Object.assign({}, body, { rid: Date.now().toString(36) + Math.random().toString(36).slice(2, 10) });
+  return fast('/sos', b, 8000).then(j => j || gasCall(Object.assign({ token:tokenNow() }, b)));
+}
+const getData = () => fast('/sos/data?who=' + encodeURIComponent(OWNER), null, 8000).then(j => j ||
+  fetch(STAFF_OS_URL + '?action=sos_data&who=' + encodeURIComponent(OWNER) + '&token=' + encodeURIComponent(tokenNow()) + '&_=' + Date.now()).then(r => r.json()));
+
+function linkify(str) {
+  return esc(str == null ? '' : str).replace(/(https?:\/\/[^\s<]+|www\.[^\s<]+)/gi, m => {
+    let url = m, tail = ''; const t = url.match(/(?:[.,;:!?)\]]|&#039;|&#39;|&quot;)+$/); if (t) { tail = t[0]; url = url.slice(0, -tail.length); }
+    if (!url) return m;
+    return '<a href="' + (/^www\./i.test(url) ? 'https://' + url : url) + '" target="_blank" rel="noopener noreferrer" class="lk">' + url + '</a>' + tail;
+  });
+}
+function toast(m) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = m; document.body.appendChild(t); setTimeout(() => t.remove(), 2200); }
+function today() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+function addDays(k, n) { const d = new Date(k + 'T12:00:00'); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+function fmt(k) { try { return new Date(k + 'T12:00:00').toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }); } catch (e) { return k; } }
+const PRI = { high:0, normal:1, low:2 };
+const pri = t => { const p = String(t.priority || '').toLowerCase(); return p in PRI ? p : 'normal'; };
+const isDone = t => String(t.status) === 'done';
+const dueKey = t => /^\d{4}-\d{2}-\d{2}$/.test(String(t.due || '')) ? String(t.due) : '';
+
+function ordIdx(t) { const i = order.indexOf(t.id); return i < 0 ? 1e9 : i; }
+function cmpOrd(a, b) { return order.length ? ordIdx(a) - ordIdx(b) || (Number(a.createdAt) || 0) - (Number(b.createdAt) || 0) : cmp(a, b); }
+function readOrder(plans) {
+  const rows = (plans || []).filter(p => p && p.type === 'task_order').sort((a, b) => (Number(a.updatedAt) || 0) - (Number(b.updatedAt) || 0));
+  const r = rows[rows.length - 1]; if (!r) { orderRow = ''; return; }
+  orderRow = r.id; try { const a = JSON.parse(r.detail); if (Array.isArray(a)) order = a.map(String); } catch (e) {}
+}
+function readRev(plans) {
+  const rows = (plans || []).filter(p => p && p.type === 'task_review').sort((a, b) => (Number(a.updatedAt) || 0) - (Number(b.updatedAt) || 0));
+  const r = rows[rows.length - 1]; if (!r) { revRow = ''; return; }
+  revRow = r.id; try { const o = JSON.parse(r.detail); if (o && typeof o === 'object' && !Array.isArray(o)) rev = o; } catch (e) {}
+}
+function readTime(plans) {
+  const rows = (plans || []).filter(p => p && p.type === 'task_time').sort((a, b) => (Number(a.updatedAt) || 0) - (Number(b.updatedAt) || 0));
+  const r = rows[rows.length - 1]; if (!r) { timeRow = ''; return; }
+  timeRow = r.id; try { const o = JSON.parse(r.detail); if (o && typeof o === 'object' && !Array.isArray(o)) timeMap = o; } catch (e) {}
+}
+function saveTime() {
+  const detail = JSON.stringify(timeMap);
+  timeChain = timeChain.then(async () => {
+    try {
+      const r = timeRow ? await post({ action:'sos_plan_update', id:timeRow, detail })
+        : await post({ action:'sos_plan_add', owner:OWNER, type:'task_time', title:'Creative projects time needed', detail, status:'active' });
+      if (!r || !r.ok) throw new Error('failed');
+      if (!timeRow && r.id) timeRow = r.id;
+    } catch (e) { toast('Couldn’t save the time needed. Check your connection.'); }
+  });
+  return timeChain;
+}
+// Dropdown + free-text "Other" box. idp = element id prefix (new: 'n', edit: 'e'); cur = saved value.
+function timeField(idp, cur) {
+  const other = !!cur && !TIMES.includes(cur);
+  return '<select id="' + idp + 'tm" onchange="timeSel(\'' + idp + '\')"><option value="">Time needed…</option>' +
+    TIMES.map(v => '<option value="' + v + '"' + (v === cur ? ' selected' : '') + '>' + v + '</option>').join('') +
+    '<option value="__other"' + (other ? ' selected' : '') + '>Other…</option></select>' +
+    '<input id="' + idp + 'to" placeholder="e.g. 3 hours, every Tuesday" value="' + (other ? esc(cur) : '') + '"' + (other ? '' : ' style="display:none"') + '>';
+}
+function timeSel(idp) { const o = $(idp + 'to'); if (o) { o.style.display = $(idp + 'tm').value === '__other' ? '' : 'none'; if (o.style.display === '') o.focus(); } }
+function timeVal(idp) { const v = $(idp + 'tm').value; return v === '__other' ? (($(idp + 'to') || {}).value || '').trim() : v; }
+function setTime(id, v) { if (v) timeMap[id] = v; else delete timeMap[id]; }
+function saveRev() {
+  const detail = JSON.stringify(rev);
+  revChain = revChain.then(async () => {
+    try {
+      const r = revRow ? await post({ action:'sos_plan_update', id:revRow, detail })
+        : await post({ action:'sos_plan_add', owner:OWNER, type:'task_review', title:'Creative projects reviews', detail, status:'active' });
+      if (!r || !r.ok) throw new Error('failed');
+      if (!revRow && r.id) revRow = r.id;
+    } catch (e) { toast('Couldn’t save the review note. Check your connection.'); }
+  });
+  return revChain;
+}
+function saveOrder(ids) {
+  order = ids.slice(); try { localStorage.setItem(ORDER_KEY, JSON.stringify(order)); } catch (e) {}
+  const detail = JSON.stringify(order);
+  orderChain = orderChain.then(async () => {
+    try {
+      const r = orderRow ? await post({ action:'sos_plan_update', id:orderRow, detail })
+        : await post({ action:'sos_plan_add', owner:OWNER, type:'task_order', title:'Creative projects order', detail, status:'active' });
+      if (!r || !r.ok) throw new Error('failed');
+      if (!orderRow && r.id) orderRow = r.id;
+    } catch (e) { toast('Couldn’t save the new order. Check your connection.'); }
+  });
+}
+
+function cmp(a, b) {
+  const da = dueKey(a) || '9999', db = dueKey(b) || '9999';
+  return da < db ? -1 : da > db ? 1 : PRI[pri(a)] - PRI[pri(b)] || String(a.title).localeCompare(String(b.title));
+}
+
+function loginView(err) {
+  $('app').innerHTML = '<div class="login"><h1>Creative Projects</h1><div class="sub">Enter your PIN (last 4 digits of your phone number).</div>' +
+    '<input id="pin" type="password" inputmode="numeric" maxlength="6" placeholder="PIN" autocomplete="off" onkeydown="if(event.key===\'Enter\')login()">' +
+    '<button onclick="login()">Open</button><div class="err" id="err">' + esc(err || '') + '</div></div>';
+  setTimeout(() => $('pin') && $('pin').focus(), 50);
+}
+async function login() {
+  const pin = ($('pin') || {}).value || ''; if (!pin) return;
+  $('err').textContent = 'Checking…';
+  try {
+    const r = await gasCall({ action:'sos_login', pin:pin.trim(), lite:true });
+    if (!r.ok) return loginView(r.nomatch ? 'That PIN didn’t match.' : (r.error || 'Could not sign in.'));
+    const names = (r.matches || []).map(m => m.name);
+    const pick = names.includes(OWNER) ? OWNER : names.find(n => ADMINS.includes(n)) || names[0];
+    start(pick);
+  } catch (e) { loginView('Couldn’t reach the server. Try again.'); }
+}
+function allowed(n) { return n === OWNER || ADMINS.includes(n); }
+
+async function start(name) {
+  if (!allowed(name)) { try { localStorage.removeItem(ME_KEY); } catch (e) {} return loginView('This page is just for the creative projects team.'); }
+  me = name; try { localStorage.setItem(ME_KEY, name); } catch (e) {}
+  try { const o = JSON.parse(localStorage.getItem(ORDER_KEY) || 'null'); if (Array.isArray(o)) order = o; } catch (e) {}
+  try { const c = JSON.parse(localStorage.getItem('lssr_creative_cache') || 'null'); if (c) { tasks = c; render(); } } catch (e) {}
+  await load();
+}
+async function load() {
+  try {
+    const r = await getData();
+    if (r && r.ok) { if (busy || dragging) return; tasks = r.tasks || []; if (Array.isArray(r.plans)) { readOrder(r.plans); readRev(r.plans); readTime(r.plans); } try { localStorage.setItem('lssr_creative_cache', JSON.stringify(tasks)); } catch (e) {} render(); }
+    else if (!tasks.length) $('app').innerHTML = '<div class="empty">' + (r && r.error === 'Staff only.' || signinNeeded || !tokenNow() ? 'Please sign in to the staff dashboard on this device first, then come back. <br><br><a href="/" style="color:var(--gold)">Open the dashboard</a>' : 'Couldn’t load projects.') + '</div>';
+  } catch (e) { if (!tasks.length) $('app').innerHTML = '<div class="empty">Couldn’t reach the server. <a href="#" style="color:var(--gold)" onclick="load();return false">Retry</a></div>'; }
+}
+
+function item(t) {
+  const d = dueKey(t), over = d && !isDone(t) && d < today(), p = pri(t);
+  const by = t.assignedBy && t.assignedBy !== OWNER ? 'From ' + esc(String(t.assignedBy).split(' ')[0]) : 'Added by John';
+  const rv = rev[t.id], sent = isSent(t), rid = esc(t.id);
+  const fdt = ms => { try { return new Date(Number(ms)).toLocaleDateString('en-US', { month:'short', day:'numeric' }); } catch (e) { return ''; } };
+  const reqName = t.assignedBy && t.assignedBy !== OWNER ? esc(t.assignedBy) : 'whoever asked for it';
+  const badge = sent ? '<span class="pill sent">Sent back</span>' : (isDone(t) && rv && rv.s === 'done' ? '<span class="pill ok">Checked off by ' + esc(String(rv.b).split(' ')[0]) + (rv.at ? ' · ' + fdt(rv.at) : '') + '</span>' : '');
+  const why = sent ? '<div class="why"><b>Sent back to ' + reqName + ' — this one is theirs to do.</b><br>' + linkify(rv.c) + '<small>Flagged by ' + esc(rv.b) + (rv.at ? ' · ' + fdt(rv.at) : '') + '</small></div>' : '';
+  const rbtn = !isRev() ? '' : sent ? '<button class="rv" title="Put it back on John’s list" onclick="unsend(\'' + rid + '\')">Undo</button>'
+    : isDone(t) ? '' : '<button class="rv" title="Mark done" onclick="markDone(\'' + rid + '\')">✓ Done</button><button class="rv" title="Send back to the requester" onclick="sending=sending===\'' + rid + '\'?\'\':\'' + rid + '\';render()">↩ Send back</button>';
+  return '<div class="item ' + p + (over ? ' over' : '') + (isDone(t) ? ' done' : '') + (sent ? ' sentback' : '') + '" data-id="' + esc(t.id) + '">' +
+    (isDone(t) || sent ? '' : '<div class="grip" title="Drag to reprioritize" aria-label="Drag to reorder" onpointerdown="dragStart(event,this)">⋮⋮</div>') +
+    '<input class="chk" type="checkbox" ' + (isDone(t) ? 'checked ' : '') + 'onchange="toggle(\'' + esc(t.id) + '\',this.checked)">' +
+    '<div class="body"><div class="ttl">' + linkify(t.title) + '</div><div class="meta">' +
+      '<span class="due' + (over ? ' over' : '') + '">' + (d ? (over ? 'Overdue · ' : 'Due ') + fmt(d) : 'No due date') + '</span>' +
+      '<span class="pill ' + p + '">' + p + '</span>' + (timeOf(t) ? '<span title="Time needed">⏱ ' + esc(timeOf(t)) + '</span>' : '') + '<span>' + by + '</span>' +
+      '<span>' + (isDone(t) ? 'Done' : sent ? 'Sent back' : 'Open') + '</span>' + badge + '</div>' + why +
+      (t.notes ? '<div class="notes">' + linkify(t.notes) + '</div>' : '') +
+      (sending === t.id ? sendForm(t) : '') + (editing === t.id ? editForm(t) : '') + '</div>' +
+    '<div class="acts">' + rbtn + '<button title="Edit" onclick="editing=editing===\'' + esc(t.id) + '\'?\'\':\'' + esc(t.id) + '\';render()">✎</button>' +
+    '<button title="Delete" onclick="del(\'' + esc(t.id) + '\')">🗑</button></div></div>';
+}
+function sendForm(t) {
+  const id = esc(t.id);
+  return '<div class="edit"><textarea class="full" id="sbc" rows="3" placeholder="Why is this going back? (required) e.g. this should be done by the person who asked"></textarea>' +
+    '<div class="row"><button onclick="sendBack(\'' + id + '\')">Send back</button><button class="ghost" onclick="sending=\'\';render()">Cancel</button></div></div>';
+}
+function sendBack(id) {
+  if (!isRev()) return;
+  const c = (($('sbc') || {}).value || '').trim(); if (!c) { toast('Please add a comment first.'); return; }
+  rev[id] = { s:'sent_back', c, b:me, at:Date.now() }; sending = ''; render(); saveRev().then(() => toast('Sent back'));
+}
+function unsend(id) { if (!isRev()) return; delete rev[id]; render(); saveRev(); }
+function markDone(id) {
+  if (!isRev()) return;
+  rev[id] = { s:'done', c:'', b:me, at:Date.now() }; saveRev(); toggle(id, true);
+}
+function editForm(t) {
+  const id = esc(t.id), pr = pri(t);
+  return '<div class="edit"><input class="full" id="et" value="' + esc(t.title) + '"><input type="date" id="ed" value="' + esc(dueKey(t)) + '">' +
+    '<select id="ep">' + ['high','normal','low'].map(v => '<option value="' + v + '"' + (v === pr ? ' selected' : '') + '>' + v[0].toUpperCase() + v.slice(1) + ' priority</option>').join('') + '</select>' +
+    timeField('e', timeOf(t)) +
+    '<input class="full" id="ef" list="fromlist" placeholder="From whom (who asked for this)" value="' + esc(t.assignedBy && t.assignedBy !== OWNER ? t.assignedBy : '') + '">' +
+    '<datalist id="fromlist">' + ['Brad Borowski','Ryan Griffin','Katie Thompson'].map(n => '<option value="' + n + '">').join('') + '</datalist>' +
+    '<textarea class="full" id="en" rows="3" placeholder="Notes / links">' + esc(t.notes || '') + '</textarea>' +
+    '<div class="row"><button onclick="saveEdit(\'' + id + '\')">Save</button><button class="ghost" onclick="editing=\'\';render()">Cancel</button></div></div>';
+}
+function saveEdit(id) {
+  const t = tasks.find(x => x.id === id); if (!t) return;
+  const title = ($('et').value || '').trim(); if (!title) return;
+  const f = { title, notes:$('en').value.trim(), due:$('ed').value || '', priority:$('ep').value, assignedBy:($('ef').value || '').trim() };
+  editing = '';
+  const tv = timeVal('e'); if (tv !== timeOf(t)) { setTime(id, tv); saveTime(); }
+  mutate(() => Object.assign(t, f), Object.assign({ action:'sos_task_update', id }, f)).then(r => { if (r) toast('Saved'); });
+}
+function del(id) {
+  if (!confirm('Delete this project?')) return;
+  if (timeMap[id]) { setTime(id, ''); saveTime(); }
+  mutate(() => { tasks = tasks.filter(x => x.id !== id); }, { action:'sos_task_delete', id });
+}
+function render() {
+  const td = today(), wk = addDays(td, 7);
+  const open = tasks.filter(t => !isDone(t) && !isSent(t)).sort(cmpOrd), sentBack = tasks.filter(isSent).sort(cmp), done = tasks.filter(isDone).sort(cmp).reverse();
+  const over = open.filter(t => dueKey(t) && dueKey(t) < td).length;
+  const week = open.filter(t => dueKey(t) && dueKey(t) >= td && dueKey(t) <= wk).length;
+  $('app').innerHTML =
+    '<div class="top"><div><h1>Creative Projects</h1><div class="sub">John’s list · ' + esc(fmt(td)) + '</div></div>' +
+    '<button class="ghost" onclick="load()">Refresh</button></div>' +
+    '<div class="stats"><div class="stat"><b>' + open.length + '</b><span>Open</span></div><div class="stat od"><b>' + over + '</b><span>Overdue</span></div>' +
+    '<div class="stat wk"><b>' + week + '</b><span>This week</span></div><div class="stat dn"><b>' + done.length + '</b><span>Done</span></div></div>' +
+    '<div class="add"><input class="full" id="nt" placeholder="Add a project…" onkeydown="if(event.key===\'Enter\')add()">' +
+    '<input type="date" id="nd"><select id="np"><option value="normal">Normal priority</option><option value="high">High priority</option><option value="low">Low priority</option></select>' +
+    timeField('n', '') +
+    '<textarea class="full" id="nn" rows="2" placeholder="Notes (optional)"></textarea><button class="full" onclick="add()">Add project</button></div>' +
+    (open.length > 1 ? '<div class="hint">Drag ⋮⋮ to reprioritize — top is most important.</div>' : '') +
+    (open.length ? '<div id="openList">' + open.map(item).join('') + '</div>' : '<div class="empty">Nothing open. Nice work.</div>') +
+    (sentBack.length ? '<h2><span>Sent back to the requester (' + sentBack.length + ')</span></h2>' + sentBack.map(item).join('') : '') +
+    '<h2 class="tog" onclick="showDone=!showDone;render()"><span>Done (' + done.length + ')</span><span>' + (showDone ? 'Hide' : 'Show') + '</span></h2>' +
+    (showDone ? done.map(item).join('') : '');
+}
+
+// ---- drag to reorder (pointer events: mouse, pen and touch; only the handle starts a drag so scrolling still works) ----
+let drag = null;
+function dragStart(e, grip) {
+  if (e.button > 0) return;
+  const el = grip.closest('.item'), list = $('openList'); if (!el || !list) return;
+  e.preventDefault();
+  drag = { el, grip, list, id:el.dataset.id, y0:e.clientY, sy0:window.scrollY, y:e.clientY, over:null, after:false, raf:0 };
+  try { grip.setPointerCapture(e.pointerId); } catch (x) {}
+  dragging = true; el.classList.add('dragging'); document.body.classList.add('reordering');
+  grip.onpointermove = dragMove; grip.onpointerup = grip.onpointercancel = dragEnd;
+  drag.raf = requestAnimationFrame(dragTick);
+}
+function dragMove(e) { if (drag) drag.y = e.clientY; }
+function dragTick() {
+  if (!drag) return;
+  const d = drag, vh = window.innerHeight;
+  if (d.y < 70) window.scrollBy(0, -Math.ceil((70 - d.y) / 5)); else if (d.y > vh - 70) window.scrollBy(0, Math.ceil((d.y - (vh - 70)) / 5));   // edge auto-scroll
+  d.el.style.transform = 'translateY(' + (d.y - d.y0 + window.scrollY - d.sy0) + 'px)';
+  let over = null, after = false;
+  const items = Array.from(d.list.children).filter(x => x !== d.el);
+  for (const x of items) { const r = x.getBoundingClientRect(); if (d.y < r.top + r.height / 2) { over = x; break; } }
+  if (!over && items.length) { over = items[items.length - 1]; after = true; }
+  if (d.over) d.over.classList.remove('dropabove', 'dropbelow');
+  d.over = over; d.after = after; if (over) over.classList.add(after ? 'dropbelow' : 'dropabove');
+  d.raf = requestAnimationFrame(dragTick);
+}
+function dragEnd() {
+  const d = drag; if (!d) return; drag = null; cancelAnimationFrame(d.raf);
+  d.grip.onpointermove = d.grip.onpointerup = d.grip.onpointercancel = null;
+  document.body.classList.remove('reordering');
+  const ids = Array.from(d.list.children).filter(x => x !== d.el).map(x => x.dataset.id);
+  if (d.over) { const at = ids.indexOf(d.over.dataset.id); ids.splice(d.after ? at + 1 : at, 0, d.id); } else ids.push(d.id);
+  const before = Array.from(d.list.children).map(x => x.dataset.id);
+  dragging = false;
+  if (ids.join() !== before.join()) {
+    // keep every other task (done ones, any not on screen) in the saved list too, after the open ones
+    saveOrder(ids.concat(order.filter(i => !ids.includes(i) && tasks.some(t => t.id === i))));
+    toast('Order saved');
+  }
+  render();
+}
+async function mutate(change, body) {
+  change(); render(); busy++;
+  try { const r = await post(body); if (!r.ok) throw new Error(r.error || 'failed'); return r; }
+  catch (e) { toast('Couldn’t save. Check your connection.'); busy--; await load(); return null; }
+  finally { if (busy) busy--; }
+}
+function toggle(id, on) {
+  const t = tasks.find(x => x.id === id); if (!t) return;
+  mutate(() => { t.status = on ? 'done' : 'open'; }, { action:'sos_task_update', id, status:on ? 'done' : 'open' });
+}
+async function add() {
+  const title = ($('nt').value || '').trim(); if (!title) return;
+  const t = { id:'tmp' + Date.now(), owner:OWNER, title, notes:$('nn').value.trim(), status:'open', createdAt:Date.now(), due:$('nd').value || '', priority:$('np').value, assignedBy:me };
+  const tv = timeVal('n');
+  // New projects go to the very top: put the id first in the manual order (seeding it from what's on screen if there's no manual order yet).
+  const base = order.length ? order.slice() : tasks.filter(x => !isDone(x) && !isSent(x)).sort(cmpOrd).map(x => x.id);
+  order = [t.id].concat(base);
+  const r = await mutate(() => tasks.push(t), { action:'sos_task_add', owner:OWNER, title, notes:t.notes, due:t.due, priority:t.priority, assignedBy:me });
+  if (r && r.id) { const tmp = t.id; t.id = r.id; saveOrder(order.map(i => i === tmp ? r.id : i)); if (tv) { setTime(t.id, tv); saveTime(); render(); } toast('Added'); }
+}
+
+// Same task list as John's staff dashboard: pick up edits made there (on return to this tab and every 60 s, never mid-edit).
+function pull() { if (me && !document.hidden && !editing && !busy && !(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))) load(); }
+document.addEventListener('visibilitychange', pull); setInterval(pull, 60000);
+
+// Already signed in to the dashboard on this device? The staff sign-in tells us who it is.
+(async () => {
+  const j = await fast('/sos', { action:'sos_login', lite:true }, 6000);
+  const n = j && j.ok && j.matches && j.matches.length ? j.matches[0].name : '';
+  if (n && allowed(n)) return start(n);
+  let saved = ''; try { saved = localStorage.getItem(ME_KEY) || ''; } catch (e) {}
+  if (saved && allowed(saved) && tokenNow()) start(saved); else loginView(n ? 'This page is just for the creative projects team.' : '');
+})();
+</script>
+</body>
+</html>

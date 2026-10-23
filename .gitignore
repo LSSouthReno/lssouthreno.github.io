@@ -1,0 +1,20 @@
+.DS_Store
+.clasp.json
+.claude/
+Deprecated/
+*.gs
+node_modules/
+.beta-build/
+
+# Secrets and private exports must never be committed (this repo is public)
+.env
+.env.*
+*.pem
+*.key
+*.p12
+secrets*
+credentials*
+service-account*.json
+*.csv
+*.xlsx
+*.docx

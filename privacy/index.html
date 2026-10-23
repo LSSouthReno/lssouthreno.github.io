@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- BETA SITE ONLY. scripts/stage.sh adds this to the beta copy; it is never in the live site. -->
+<meta name="robots" content="noindex,nofollow">
+<script>
+(function(){
+  // The beta site reads the LIVE data files from lssouthreno.com (the backend only updates
+  // those), so beta always shows today's real numbers. Everything else (the page code) is beta.
+  var LIVE = 'https://lssouthreno.com', DATA = ["absences.json", "appsscript.json", "dashboard-data.json", "eos-data.json", "ids_log.json", "joy_bombs.json", "pathway.json", "shepherding-data.json"];
+  var real = window.fetch;
+  window.fetch = function(input, init){
+    try {
+      var u = new URL(typeof input === 'string' ? input : input.url, location.href);
+      var file = u.pathname.replace(/^\//, '');
+      if (u.origin === location.origin && DATA.indexOf(file) !== -1) input = LIVE + u.pathname + u.search;
+    } catch(e) {}
+    return real.call(this, input, init);
+  };
+  window.LSSR_BETA = {"commit":"414b7661","built":"20261023T152917Z","live":"https://lssouthreno.com"};
+  function ribbon(){
+    if (document.getElementById('lssrBetaRibbon') || window.top !== window) return;   // one ribbon, not one per embedded frame
+    var d = document.createElement('div');
+    d.id = 'lssrBetaRibbon';
+    d.innerHTML = 'BETA &middot; test site &middot; edits still save to the real data';
+    d.title = 'Beta build ' + (window.LSSR_BETA.commit || '') + ' (' + (window.LSSR_BETA.built || '') + '). The live site is lssouthreno.com.';
+    d.style.cssText = 'position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:2147483000;background:#7c3aed;color:#fff;font:700 11px/1 Montserrat,system-ui,sans-serif;letter-spacing:.08em;padding:5px 12px;border-radius:0 0 8px 8px;pointer-events:none;box-shadow:0 2px 10px rgba(0,0,0,.4);white-space:nowrap';
+    document.body.appendChild(d);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ribbon); else ribbon();
+})();
+</script>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#f5f3ee">
+<title>Privacy · Living Stones South Reno</title>
+<link rel="icon" type="image/png" href="/assets/app/icon-192.png">
+<!--
+  Privacy policy for the Living Stones app (My Journey at /journey/) and lssouthreno.com.
+  Linked from the app's sign-in screen and footer; this URL goes in App Store Connect and Google Play.
+  Keep it TRUE: when the app starts collecting something new (push tokens, location…), update this page
+  and the App Store "privacy nutrition label" the same day. Last reviewed: see the date below.
+-->
+<style>
+  :root { --bg:#f5f3ee; --card:#fff; --text:#2b2824; --muted:#6d675e; --line:#e4dfd5; --accent:#8a6a1f; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; background:var(--bg); color:var(--text); font:16px/1.65 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-font-smoothing:antialiased; }
+  main { max-width:720px; margin:0 auto; padding:32px 16px 64px; }
+  h1 { font-size:30px; line-height:1.2; margin:0 0 6px; }
+  h2 { font-size:19px; margin:34px 0 8px; }
+  p, li { color:var(--text); }
+  .muted { color:var(--muted); font-size:14px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px 20px; margin:20px 0; }
+  ul { padding-left:22px; } li { margin:6px 0; }
+  a { color:var(--accent); }
+  table { width:100%; border-collapse:collapse; font-size:14.5px; }
+  th, td { text-align:left; vertical-align:top; padding:9px 8px; border-top:1px solid var(--line); }
+  th { color:var(--muted); font-weight:600; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#161513; --card:#1f1e1b; --text:#ece8e1; --muted:#a59e93; --line:#33302b; --accent:#d9b65a; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Your privacy</h1>
+  <p class="muted">Living Stones South Reno · the Living Stones app and lssouthreno.com · Updated October 19, 2026</p>
+
+  <div class="card">
+    <b>The short version.</b> We use your information only to care for you and help you take your next step at Living Stones.
+    We never sell it, we don't show ads, and we don't use tracking or advertising tools.
+    Your My Journey page is private: only you, and the pastors who care for you, can see it.
+  </div>
+
+  <h2>What we use, and why</h2>
+  <table>
+    <tr><th>Information</th><th>Why</th></tr>
+    <tr><td>Your name, photo, contact details, and household, from your Living Stones profile in Planning Center</td><td>To show your page and greet you by name.</td></tr>
+    <tr><td>Your involvement: groups, serving teams, membership, baptism, classes, and events you've signed up for</td><td>To show where you are on your journey and suggest a next step.</td></tr>
+    <tr><td>Whether you give, and how regularly (never amounts)</td><td>Only to suggest giving as a possible next step. Amounts are never shown in the app.</td></tr>
+    <tr><td>Your mobile number, and the one-time code we text or email you</td><td>To sign you in without a password.</td></tr>
+    <tr><td>Notes and prayer requests you send</td><td>Delivered to your pastor and the prayer team, and kept private in our church records.</td></tr>
+    <tr><td>Changes you make to your own contact info or photo</td><td>Saved to your Planning Center profile.</td></tr>
+    <tr><td>If you serve on a Sunday: your name, team, role and service time</td><td>Shown to other signed-in members on the Sunday schedule, so everyone knows who's serving. Never your contact details.</td></tr>
+  </table>
+
+  <h2>Who handles it for us</h2>
+  <ul>
+    <li><b>Planning Center</b> keeps our church records. The app reads from it and writes your updates back to it.</li>
+    <li><b>Google</b> (Apps Script and Workspace) runs the small server behind the app and sends sign-in emails.</li>
+    <li><b>Twilio</b> sends the sign-in text messages. They receive only your phone number and the code.</li>
+    <li><b>GitHub Pages</b> hosts the website files.</li>
+  </ul>
+  <p>Each of these companies may use your data only to provide that service to us.</p>
+
+  <h2>On your phone</h2>
+  <p>
+    After you sign in, your phone keeps a sign-in pass for up to 90 days, so you don't need a new code every time.
+    It also keeps a copy of your page so it opens quickly on weak Wi-Fi.
+    <b>Sign out</b> removes both from the device and ends the pass on our server.
+  </p>
+
+  <h2>Your choices</h2>
+  <ul>
+    <li><b>See or fix your information.</b> Open <i>Me → Profile</i> in the app, or tell us if something isn't right.</li>
+    <li><b>Delete your account and data.</b> In the app, open <i>Me → Profile → Delete my account</i>. This signs you out everywhere and sends us a deletion request. Within 30 days we remove your app sign-in and the personal information we hold about you, except the giving records that U.S. tax law requires us to keep. We'll confirm with you when it's done.</li>
+    <li><b>Ask us anything</b> about your data at <a href="mailto:brad@lschurches.com">brad@lschurches.com</a>.</li>
+  </ul>
+
+  <h2>Children</h2>
+  <p>The app is meant for adults (18 and over). We don't knowingly let children sign in. Any information about children comes from their parents' household records in Planning Center.</p>
+
+  <h2>Keeping it safe</h2>
+  <p>All connections are encrypted (HTTPS). Sign-in codes expire within minutes. Only people with a church role, such as pastors and staff, can see information beyond their own, and each person sees only what their role needs. The one exception: signed-in members can see the names of people serving on Sundays (name, team, role and service time, nothing else). If something ever goes wrong, we'll tell the people affected promptly.</p>
+
+  <h2>Changes</h2>
+  <p>If we change how we use your information, we'll update this page and the date at the top.</p>
+
+  <p class="muted" style="margin-top:40px"><a href="/journey/">← Back to the app</a></p>
+</main>
+</body>
+</html>

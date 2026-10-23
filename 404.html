@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- BETA SITE ONLY. scripts/stage.sh adds this to the beta copy; it is never in the live site. -->
+<meta name="robots" content="noindex,nofollow">
+<script>
+(function(){
+  // The beta site reads the LIVE data files from lssouthreno.com (the backend only updates
+  // those), so beta always shows today's real numbers. Everything else (the page code) is beta.
+  var LIVE = 'https://lssouthreno.com', DATA = ["absences.json", "appsscript.json", "dashboard-data.json", "eos-data.json", "ids_log.json", "joy_bombs.json", "pathway.json", "shepherding-data.json"];
+  var real = window.fetch;
+  window.fetch = function(input, init){
+    try {
+      var u = new URL(typeof input === 'string' ? input : input.url, location.href);
+      var file = u.pathname.replace(/^\//, '');
+      if (u.origin === location.origin && DATA.indexOf(file) !== -1) input = LIVE + u.pathname + u.search;
+    } catch(e) {}
+    return real.call(this, input, init);
+  };
+  window.LSSR_BETA = {"commit":"414b7661","built":"20261023T152917Z","live":"https://lssouthreno.com"};
+  function ribbon(){
+    if (document.getElementById('lssrBetaRibbon') || window.top !== window) return;   // one ribbon, not one per embedded frame
+    var d = document.createElement('div');
+    d.id = 'lssrBetaRibbon';
+    d.innerHTML = 'BETA &middot; test site &middot; edits still save to the real data';
+    d.title = 'Beta build ' + (window.LSSR_BETA.commit || '') + ' (' + (window.LSSR_BETA.built || '') + '). The live site is lssouthreno.com.';
+    d.style.cssText = 'position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:2147483000;background:#7c3aed;color:#fff;font:700 11px/1 Montserrat,system-ui,sans-serif;letter-spacing:.08em;padding:5px 12px;border-radius:0 0 8px 8px;pointer-events:none;box-shadow:0 2px 10px rgba(0,0,0,.4);white-space:nowrap';
+    document.body.appendChild(d);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ribbon); else ribbon();
+})();
+</script>
+
+<meta charset="UTF-8">
+<meta name="referrer" content="no-referrer">
+<title>Church Dashboard</title>
+<script>
+  // Clean URLs on GitHub Pages: every section address (lssouthreno.com/sunday, /staff …)
+  // lands here; hand it to the dashboard, which restores the address and opens that page.
+  // This page is also padded past 512 bytes so every browser shows it instead of its own
+  // "not found" screen. ------------------------------------------------------------------
+  // Short links into the Living Stones app (the member app at /journey/): lssouthreno.com/give etc.
+  var APP = { '/app': '', '/give': 'give', '/events': 'events', '/connect': 'connect', '/me': 'me', '/prayer': 'me/prayer', '/next': '' };
+  var path = location.pathname.replace(/\/+$/, '').toLowerCase();
+  // The office TV (lssouthreno.com/calendar?tv=1) stays on the frozen Oct 13 calendar (tv.html) — Brad: never change it.
+  if (path === '/calendar' && /(^|[?&])tv=1(&|$)/.test(location.search)) location.replace('/tv.html?r=' + encodeURIComponent('/calendar' + location.search));
+  else if (Object.prototype.hasOwnProperty.call(APP, path)) location.replace('/journey/' + location.search + (APP[path] ? '#' + APP[path] : ''));
+  else location.replace('/?r=' + encodeURIComponent(location.pathname + location.search) + location.hash);
+</script>
+<meta name="robots" content="noindex">
+</head>
+<body style="background:#141414;color:#a39e94;font-family:sans-serif;padding:40px">Loading the dashboard…</body>
+</html>

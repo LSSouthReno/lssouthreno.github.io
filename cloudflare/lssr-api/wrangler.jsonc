@@ -1,0 +1,19 @@
+// LSSR fast API (Cloudflare Worker) — phase P1 of the Fast Backend Plan.
+// Secrets (never in this file): INGEST_KEY — set with `npx wrangler secret put INGEST_KEY`;
+// the same value lives in the Apps Script project's Script Property WORKER_KEY.
+{
+  "name": "lssr-api",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-01",
+  "workers_dev": true,
+  "routes": [{ "pattern": "api.lssouthreno.com", "custom_domain": true }],
+  "preview_urls": false,
+  "kv_namespaces": [{ "binding": "LSSR_KV", "id": "7b2fc764f7ed4aa09a0d4ea2819d91db" }],
+  // Staff OS to-dos / plans (P2 step 2). Schema: migrations/ (npx wrangler d1 migrations apply lssr-staff-os --remote).
+  "d1_databases": [{ "binding": "SOS_DB", "database_name": "lssr-staff-os", "database_id": "b45530e5-a66f-43c3-98b8-1c855f0a7a65" }],
+  "vars": {
+    "GAS_URL": "https://script.google.com/macros/s/AKfycby82X64_1Pty8PDklGroIx3tteSaLn-8XUsLpODyX77pZ7TquGgaVSrBv9sqQAMBoDm/exec",
+    "ORIGINS": "https://lssouthreno.com,https://www.lssouthreno.com,https://lssouthreno.github.io"
+  },
+  "observability": { "enabled": false }
+}

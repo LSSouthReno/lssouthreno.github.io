@@ -1,0 +1,2334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- BETA SITE ONLY. scripts/stage.sh adds this to the beta copy; it is never in the live site. -->
+<meta name="robots" content="noindex,nofollow">
+<script>
+(function(){
+  // The beta site reads the LIVE data files from lssouthreno.com (the backend only updates
+  // those), so beta always shows today's real numbers. Everything else (the page code) is beta.
+  var LIVE = 'https://lssouthreno.com', DATA = ["absences.json", "appsscript.json", "dashboard-data.json", "eos-data.json", "ids_log.json", "joy_bombs.json", "pathway.json", "shepherding-data.json"];
+  var real = window.fetch;
+  window.fetch = function(input, init){
+    try {
+      var u = new URL(typeof input === 'string' ? input : input.url, location.href);
+      var file = u.pathname.replace(/^\//, '');
+      if (u.origin === location.origin && DATA.indexOf(file) !== -1) input = LIVE + u.pathname + u.search;
+    } catch(e) {}
+    return real.call(this, input, init);
+  };
+  window.LSSR_BETA = {"commit":"414b7661","built":"20261023T152917Z","live":"https://lssouthreno.com"};
+  function ribbon(){
+    if (document.getElementById('lssrBetaRibbon') || window.top !== window) return;   // one ribbon, not one per embedded frame
+    var d = document.createElement('div');
+    d.id = 'lssrBetaRibbon';
+    d.innerHTML = 'BETA &middot; test site &middot; edits still save to the real data';
+    d.title = 'Beta build ' + (window.LSSR_BETA.commit || '') + ' (' + (window.LSSR_BETA.built || '') + '). The live site is lssouthreno.com.';
+    d.style.cssText = 'position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:2147483000;background:#7c3aed;color:#fff;font:700 11px/1 Montserrat,system-ui,sans-serif;letter-spacing:.08em;padding:5px 12px;border-radius:0 0 8px 8px;pointer-events:none;box-shadow:0 2px 10px rgba(0,0,0,.4);white-space:nowrap';
+    document.body.appendChild(d);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ribbon); else ribbon();
+})();
+</script>
+
+<script src="data-access.js"></script>
+<script src="team-checklists.js"></script>
+<script>
+  // Force HTTPS: the Admin gate hashes via crypto.subtle (Web Crypto), which
+  // browsers disable on non-secure (http://) pages — so the gate silently fails
+  // over HTTP. Bounce any plain-HTTP visit to HTTPS (localhost exempt for dev).
+  (function () {
+    var h = location.hostname;
+    if (location.protocol === 'http:' && h !== 'localhost' && h !== '127.0.0.1') {
+      location.replace('https://' + location.host + location.pathname + location.search + location.hash);
+    }
+  })();
+</script>
+<meta charset="UTF-8">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Team Onboarding Guide · Living Stones Church</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@1,500;1,600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    /* Living Stones palette */
+    --bg:        #1e1c1b;
+    --surface:   #292927;
+    --card:      #302e2c;
+    --card2:     #3a3735;
+    --border:    #4a4744;
+    --text:      #f0ece8;
+    --muted:     #9a9490;
+    --accent:    #c49a2e;
+    --accent2:   #e0b84a;
+    --danger:    #e05a3a;
+    --radius:    10px;
+  }
+
+  body {
+    font-family: 'Montserrat', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  .app-header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 1.1rem 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  .header-logo {
+    width: 36px; height: 36px;
+    background: var(--accent);
+    border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.2rem; flex-shrink: 0;
+  }
+  .app-header h1 { font-size: 1.05rem; font-weight: 800; letter-spacing: .02em; color: var(--text); }
+  .app-header p  { font-size: .75rem; color: var(--muted); font-weight: 400; }
+  .back-btn {
+    display: inline-flex; align-items: center; gap: .35rem;
+    padding: .5rem .95rem;
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--text);
+    font-size: .78rem; font-weight: 700;
+    letter-spacing: .04em;
+    text-decoration: none;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: border-color .15s, color .15s;
+  }
+  .back-btn:hover { border-color: var(--accent); color: var(--accent2); }
+  .admin-btn {
+    margin-left: auto; flex-shrink: 0;
+    padding: .5rem .95rem;
+    background: var(--card2); border: 1px solid var(--border); border-radius: 999px;
+    color: var(--muted);
+    font-family: 'Montserrat', sans-serif;
+    font-size: .74rem; font-weight: 700; letter-spacing: .04em;
+    cursor: pointer; white-space: nowrap;
+    transition: border-color .15s, color .15s;
+  }
+  .admin-btn:hover { border-color: var(--accent); color: var(--accent2); }
+  @media print { .back-btn, .admin-btn { display: none; } }
+
+  /* ── ADMIN OVERLAY ── */
+  #adminOverlay {
+    display: none; position: fixed; inset: 0; z-index: 200;
+    background: rgba(0,0,0,.72);
+    align-items: flex-start; justify-content: center;
+    padding: 3rem 1rem;
+    overflow-y: auto;
+  }
+  #adminOverlay.open { display: flex; }
+  .adm-box {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    width: 100%; max-width: 560px;
+    padding: 1.6rem 1.5rem;
+  }
+  .adm-x {
+    position: absolute; top: .9rem; right: .9rem;
+    background: none; border: 1px solid var(--border); border-radius: 6px;
+    color: var(--muted); cursor: pointer;
+    width: 28px; height: 28px; font-size: .8rem;
+  }
+  .adm-x:hover { color: var(--text); border-color: var(--accent); }
+  .adm-title { font-size: 1rem; font-weight: 800; letter-spacing: .02em; margin-bottom: .25rem; padding-right: 2rem; }
+  .adm-sub { font-size: .78rem; color: var(--muted); line-height: 1.5; margin-bottom: 1.2rem; }
+  .adm-label { display: block; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-bottom: .35rem; }
+  .adm-pwrow { display: flex; gap: .55rem; }
+  .adm-pwrow input {
+    flex: 1; padding: .6rem .85rem;
+    background: var(--card); border: 1.5px solid var(--border); border-radius: 7px;
+    color: var(--text); font-family: 'Montserrat', sans-serif; font-size: .85rem; outline: none;
+  }
+  .adm-pwrow input:focus { border-color: var(--accent); }
+  .adm-pwrow .btn-secondary { padding: .6rem 1.1rem; }
+  .adm-err { color: var(--danger); font-size: .78rem; margin-top: .5rem; font-weight: 600; }
+  .adm-note { font-size: .82rem; color: var(--muted); line-height: 1.6; padding: .6rem 0; }
+  .adm-row {
+    display: flex; align-items: center; justify-content: space-between; gap: .8rem;
+    background: var(--card2); border: 1px solid var(--border); border-radius: 8px;
+    padding: .7rem .9rem; margin-bottom: .5rem;
+  }
+  .adm-team { font-size: .88rem; font-weight: 700; color: var(--text); }
+  .adm-meta { font-size: .72rem; color: var(--muted); margin-top: .15rem; }
+  .adm-row .btn-secondary { padding: .45rem .9rem; font-size: .72rem; }
+  .adm-del { padding: .45rem .7rem !important; }
+  .adm-del:hover { border-color: var(--danger); color: var(--danger); }
+
+  /* ── LAYOUT ── */
+  .container { max-width: 760px; margin: 0 auto; padding: 2rem 1.5rem 5rem; }
+
+  /* ── SECTION HEADERS ── */
+  .sec-title {
+    font-size: .65rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .15em;
+    color: var(--accent);
+    margin: 2.2rem 0 1rem;
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+  }
+  .sec-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ── FIELDS ── */
+  .field { margin-bottom: .9rem; }
+  .field label {
+    display: block;
+    font-size: .72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: var(--muted);
+    margin-bottom: .35rem;
+  }
+  .field label .opt { text-transform: none; font-weight: 400; }
+  .field input,
+  .field select,
+  .field textarea {
+    width: 100%;
+    padding: .65rem .9rem;
+    background: var(--card);
+    border: 1.5px solid var(--border);
+    border-radius: 7px;
+    font-size: .88rem;
+    font-family: 'Montserrat', sans-serif;
+    color: var(--text);
+    outline: none;
+    transition: border-color .15s;
+  }
+  .field input::placeholder,
+  .field textarea::placeholder { color: #6a6663; }
+  .field select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right .85rem center; }
+  .field select option { background: #2a2825; }
+  .field input:focus,
+  .field select:focus,
+  .field textarea:focus { border-color: var(--accent); }
+  .field textarea { resize: vertical; min-height: 80px; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: .85rem; }
+  @media (max-width: 520px) { .two-col { grid-template-columns: 1fr; } }
+
+  /* ── CHECKBOXES ── */
+  .check-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: .4rem .6rem;
+  }
+  .check-item { display: flex; align-items: center; gap: .45rem; font-size: .83rem; cursor: pointer; color: var(--text); }
+  .check-item input[type=checkbox] {
+    width: 16px; height: 16px;
+    accent-color: var(--accent);
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+
+  /* ── PCO INFO BOX ── */
+  .pco-box {
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 8px;
+    padding: .9rem 1.1rem;
+    margin-bottom: .9rem;
+  }
+  .pco-box-title { font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: var(--accent); margin-bottom: .4rem; }
+  .pco-box p { font-size: .82rem; color: var(--muted); line-height: 1.6; }
+  .pco-box strong { color: var(--text); }
+  .pco-steps { list-style: none; margin-top: .5rem; }
+  .pco-steps li { display: flex; gap: .5rem; font-size: .82rem; color: var(--muted); margin-bottom: .3rem; line-height: 1.5; }
+  .pco-steps li .num { color: var(--accent); font-weight: 700; flex-shrink: 0; }
+
+  /* ── GENERATE BUTTON ── */
+  .generate-btn {
+    display: block; width: 100%;
+    margin-top: 2.5rem;
+    padding: 1rem;
+    background: var(--accent);
+    color: #1a1814;
+    border: none;
+    border-radius: 8px;
+    font-size: .95rem;
+    font-weight: 800;
+    font-family: 'Montserrat', sans-serif;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background .2s;
+  }
+  .generate-btn:hover { background: var(--accent2); }
+
+  /* ── PREVIEW OVERLAY ── */
+  #preview-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.7);
+    z-index: 100;
+    overflow-y: auto;
+    padding: 2rem 1rem;
+    align-items: flex-start;
+    justify-content: center;
+  }
+  #preview-overlay.open { display: flex; }
+
+  .preview-toolbar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-bottom: none;
+    width: 100%; max-width: 740px;
+    border-radius: var(--radius) var(--radius) 0 0;
+    padding: .8rem 1.25rem;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .preview-toolbar h3 { font-size: .85rem; font-weight: 700; color: var(--text); letter-spacing: .03em; }
+  .tb-btns { display: flex; gap: .6rem; }
+  .btn-sm {
+    padding: .4rem .9rem; font-size: .78rem; border-radius: 6px;
+    border: none; cursor: pointer; font-weight: 700;
+    font-family: 'Montserrat', sans-serif;
+    letter-spacing: .05em; text-transform: uppercase;
+  }
+  .btn-print { background: var(--accent); color: #1a1814; }
+  .btn-print:hover { background: var(--accent2); }
+  .btn-close  { background: var(--card2); color: var(--muted); border: 1px solid var(--border); }
+  .btn-close:hover  { color: var(--text); }
+
+  /* ── SAVED GUIDES / ACTION BUTTONS ── */
+  .btn-secondary {
+    padding: .7rem 1rem;
+    background: var(--card2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: 'Montserrat', sans-serif;
+    font-size: .76rem;
+    font-weight: 700;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    cursor: pointer;
+    text-align: center;
+    transition: border-color .15s, color .15s;
+  }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent2); }
+  .save-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6rem; margin-top: .8rem; }
+  @media (max-width: 560px) { .save-row { grid-template-columns: 1fr; } }
+  .saved-bar { display: flex; gap: .6rem; }
+  .saved-bar select { flex: 1; }
+  .saved-bar .btn-secondary { flex-shrink: 0; padding: .55rem .9rem; }
+  .saved-hint { font-size: .74rem; color: var(--muted); margin-top: .45rem; line-height: 1.5; }
+  .draft-note {
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 8px;
+    padding: .7rem 1rem;
+    font-size: .8rem;
+    color: var(--text);
+    margin-bottom: 1.2rem;
+    display: flex; align-items: center; justify-content: space-between; gap: .8rem;
+  }
+  .draft-note button {
+    background: none; border: 1px solid var(--border); border-radius: 6px;
+    color: var(--muted); cursor: pointer; padding: .3rem .7rem;
+    font-family: 'Montserrat', sans-serif; font-size: .72rem; font-weight: 700;
+    flex-shrink: 0;
+  }
+  .draft-note button:hover { color: var(--text); border-color: var(--accent); }
+</style>
+
+<!-- Styles for the generated document itself. Kept in a separate tag so the
+     print frame and exports can reuse them verbatim (single source of truth). -->
+<style id="doc-styles">
+  #pdf-doc {
+    background: #ffffff;
+    width: 100%; max-width: 740px;
+    flex-shrink: 0;
+    border-radius: 0 0 var(--radius) var(--radius);
+    overflow: hidden;
+    color: #1a1814;
+    font-family: 'Montserrat', sans-serif;
+  }
+
+  /* Cover */
+  .doc-cover {
+    background: #1e1c1b;
+    color: #fff;
+    padding: 2.75rem 2.5rem 2.25rem;
+    position: relative;
+    overflow: hidden;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .doc-cover-pattern {
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(
+      135deg,
+      transparent,
+      transparent 40px,
+      rgba(196,154,46,.04) 40px,
+      rgba(196,154,46,.04) 41px
+    );
+    pointer-events: none;
+  }
+  .doc-cover-row {
+    position: relative;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 2rem;
+  }
+  .doc-logo { width: 104px; height: auto; flex-shrink: 0; }
+  .doc-cover-right { text-align: right; min-width: 0; }
+  .doc-eyebrow {
+    font-size: .62rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .18em;
+    color: #c49a2e; margin-bottom: .6rem;
+  }
+  .doc-team-name {
+    font-size: 2.1rem; font-weight: 900;
+    line-height: 1.1; color: #fff;
+    letter-spacing: -.01em;
+  }
+  .doc-subtitle {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-style: italic; font-weight: 500;
+    font-size: 1.35rem; color: #e0b84a;
+    margin-top: .35rem; letter-spacing: .03em;
+  }
+  .doc-cover-foot {
+    position: relative;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 1rem; margin-top: 1.7rem;
+  }
+  .doc-gold-bar { width: 48px; height: 3px; background: #c49a2e; border-radius: 2px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .doc-leader-pill {
+    display: inline-flex; align-items: center; gap: .5rem;
+    background: rgba(196,154,46,.15);
+    border: 1px solid rgba(196,154,46,.3);
+    padding: .4rem .9rem; border-radius: 99px;
+    font-size: .78rem; color: #c49a2e; font-weight: 600;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Body */
+  .doc-body { padding: 2rem 2.5rem 1.5rem; background: #fff; }
+
+  .doc-welcome {
+    background: #f7f4ef;
+    border-left: 3px solid #c49a2e;
+    border-radius: 7px;
+    padding: 1rem 1.2rem;
+    font-size: .86rem;
+    color: #2e2a26;
+    margin-bottom: 1.75rem;
+    line-height: 1.7;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .doc-sec { margin-bottom: 1.6rem; }
+  .doc-sec-title {
+    font-size: .6rem; font-weight: 800;
+    text-transform: uppercase; letter-spacing: .15em;
+    color: #c49a2e;
+    padding-bottom: .4rem;
+    border-bottom: 2px solid #c49a2e;
+    margin-bottom: .9rem;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .doc-text { font-size: .87rem; color: #2e2a26; line-height: 1.75; }
+
+  .doc-list { list-style: none; padding: 0; }
+  .doc-list li {
+    display: flex; gap: .5rem; align-items: flex-start;
+    font-size: .87rem; color: #2e2a26;
+    margin-bottom: .4rem; line-height: 1.65;
+  }
+  .doc-list li::before { content: '▸'; color: #c49a2e; flex-shrink: 0; margin-top: .1rem; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  .doc-cards { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; }
+  .doc-card {
+    background: #f7f4ef;
+    border-radius: 7px;
+    padding: .8rem 1rem;
+    border-left: 3px solid #c49a2e;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .doc-card-lbl { font-size: .6rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: #9a9490; margin-bottom: .15rem; }
+  .doc-card-val { font-size: .85rem; font-weight: 600; color: #2e2a26; }
+
+  .doc-tip {
+    background: #faf7f0;
+    border: 1px solid #e8d9b0;
+    border-radius: 7px;
+    padding: .65rem .9rem;
+    font-size: .84rem;
+    color: #5a4a20;
+    display: flex; gap: .5rem; align-items: flex-start;
+    margin: .5rem 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .doc-step-box {
+    background: #f2f0ec;
+    border-radius: 7px;
+    padding: .9rem 1rem;
+    margin: .5rem 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .doc-step-box-title { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #9a9490; margin-bottom: .5rem; }
+  .doc-steps { list-style: none; }
+  .doc-steps li { display: flex; gap: .6rem; font-size: .84rem; color: #2e2a26; margin-bottom: .35rem; line-height: 1.55; }
+  .doc-steps .step-n { background: #c49a2e; color: #fff; font-weight: 700; font-size: .68rem; width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: .1rem; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  .doc-divider { height: 1px; background: #e8e4df; margin: 1.3rem 0; }
+
+  .doc-footer {
+    background: #f2f0ec;
+    border-top: 1px solid #e0dbd4;
+    padding: .9rem 2.5rem;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: .72rem; color: #9a9490; font-weight: 600;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .doc-footer-logo { font-size: .7rem; font-weight: 800; letter-spacing: .08em; color: #c49a2e; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  /* Four H's cards in PDF */
+  .h-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .65rem; }
+  .h-card {
+    background: #1e1c1b;
+    border-radius: 7px;
+    padding: .85rem 1rem;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .h-card-letter { font-size: 1.5rem; font-weight: 900; color: #c49a2e; line-height: 1; margin-bottom: .25rem; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .h-card-word   { font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: #fff; margin-bottom: .3rem; }
+  .h-card-desc   { font-size: .78rem; color: rgba(255,255,255,.55); line-height: 1.5; }
+
+  /* Attachments */
+  .doc-attach-list { list-style: none; padding: 0; }
+  .doc-attach-list li {
+    display: flex; align-items: center; gap: .5rem;
+    font-size: .84rem; color: #2e2a26;
+    padding: .45rem .7rem;
+    background: #f7f4ef;
+    border-radius: 6px;
+    margin-bottom: .4rem;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .doc-attach-img { width: 100%; border-radius: 7px; margin-bottom: .6rem; display: block; }
+</style>
+
+<style>
+  /* Upload zone in form */
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    padding: 1.25rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .2s;
+    position: relative;
+  }
+  .upload-zone:hover { border-color: var(--accent); }
+  .upload-zone input[type=file] {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    opacity: 0; cursor: pointer;
+  }
+  .upload-zone-icon { font-size: 1.6rem; margin-bottom: .4rem; }
+  .upload-zone p { font-size: .82rem; color: var(--muted); }
+  .upload-zone strong { color: var(--accent); }
+  .file-list { list-style: none; margin-top: .75rem; }
+  .file-list li {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--card2); border: 1px solid var(--border);
+    border-radius: 6px; padding: .45rem .75rem;
+    font-size: .8rem; margin-bottom: .35rem;
+  }
+  .file-list li span { color: var(--text); }
+  .file-list li button {
+    background: none; border: none; color: var(--muted);
+    cursor: pointer; font-size: .85rem; padding: 0 .2rem;
+  }
+  .file-list li button:hover { color: var(--danger); }
+
+  /* ── PRINT (fallback for Cmd/Ctrl+P — the Print button uses a dedicated
+        clean frame via printGuide(), which is the reliable path) ── */
+  @media print {
+    body { background: #fff !important; }
+    body:has(#preview-overlay.open) .app-header,
+    body:has(#preview-overlay.open) .container,
+    body:has(#preview-overlay.open) .preview-toolbar { display: none !important; }
+    #preview-overlay.open { position: static; background: #fff; padding: 0; overflow: visible; }
+    #preview-overlay.open > div { max-width: 100%; }
+    #pdf-doc { max-width: 100%; border-radius: 0; overflow: visible; }
+    .doc-sec { break-inside: avoid; }
+    .doc-sec:has(#d-schedule), .doc-sec:has(#d-pco), .doc-sec:has(#d-attachments) { break-inside: auto; }
+    .doc-sec-title { break-after: avoid; }
+    .doc-card, .h-card, .h-grid, .doc-cards, .doc-step-box, .doc-tip, .doc-welcome, .doc-list li, .doc-steps li { break-inside: avoid; }
+    p, li { orphans: 3; widows: 3; }
+    @page { margin: 0.5in 0 0.55in; size: letter; }
+    @page :first { margin-top: 0; }
+  }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <a class="back-btn" href="index.html" onclick="if (history.length > 1 && document.referrer.includes('index.html')) { history.back(); return false; }">‹ Back to Dashboard</a>
+  <div class="header-logo">📋</div>
+  <div>
+    <h1>Team Onboarding Guide Generator</h1>
+    <p>Living Stones Church · South Reno</p>
+  </div>
+  <button class="admin-btn" onclick="openAdmin()" title="Staff only — view guides saved by all team leaders">🔒 Admin</button>
+</header>
+
+<!-- ════════ ADMIN — all saved guides ════════ -->
+<div id="adminOverlay" onclick="if(event.target===this)closeAdmin()">
+  <div class="adm-box">
+    <button class="adm-x" onclick="closeAdmin()" title="Close">✕</button>
+    <div class="adm-title">Saved Onboarding Guides</div>
+    <div class="adm-sub">Every guide a team leader generates is saved here — one current guide per team.</div>
+
+    <div id="admLocked">
+      <label class="adm-label">Admins only</label>
+      <p class="adm-note">Sign in on the dashboard with your phone number (as a staff admin), then come back and tap Open.</p>
+      <div class="adm-pwrow"><button class="btn-secondary" onclick="admUnlock()">Open</button></div>
+      <div class="adm-err" id="admErr" style="display:none">This needs a staff admin signed in on this device. <a href="/" target="_blank" rel="noopener">Sign in on the dashboard ›</a></div>
+    </div>
+
+    <div id="admContent" style="display:none">
+      <div id="admList"></div>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="draft-note" id="draft-note" style="display:none">
+    <span>✔ We restored your work-in-progress from last time. Keep going, or start over.</span>
+    <button onclick="clearDraft()">Start Fresh</button>
+  </div>
+
+  <!-- ════════════════ SAVED GUIDES ════════════════ -->
+  <div class="sec-title">Saved Guides</div>
+
+  <div class="field">
+    <label>Open a previously saved guide</label>
+    <div class="saved-bar">
+      <select id="saved-select">
+        <option value="">— No saved guides in this browser yet —</option>
+      </select>
+      <button class="btn-secondary" onclick="loadSelectedGuide()">Load</button>
+      <button class="btn-secondary" onclick="deleteSelectedGuide()">Delete</button>
+    </div>
+    <p class="saved-hint">Guides save to <strong>this browser on this computer</strong>. To edit a guide on a different computer (or hand it to someone else), use <strong>Export Guide File</strong> at the bottom of the form and send them the file — they can import it here and pick up where you left off.</p>
+  </div>
+
+  <!-- ════════════════ TEAM INFO ════════════════ -->
+  <div class="sec-title">Team Info</div>
+
+  <div class="field">
+    <label>Team Name</label>
+    <select id="team-name" onchange="handleTeamSelect(this.value)">
+      <option value="">Select your team...</option>
+      <option>Worship Team</option>
+      <option>Tech Team</option>
+      <option>First Impressions</option>
+      <option>Connection Team</option>
+      <option>Hospitality Team</option>
+      <option>Coffee Team</option>
+      <option>Presiders Team</option>
+      <option>Stepping Stones (Kids)</option>
+      <option>Enrichment</option>
+      <option>LS Students</option>
+      <option>Breakfast Team</option>
+      <option>Parking Team</option>
+      <option>Safety Team</option>
+      <option>Prayer Team</option>
+      <option>Service Captains</option>
+      <option value="Other">Other</option>
+    </select>
+  </div>
+  <div class="field" id="team-name-other-wrap" style="display:none">
+    <label>Team Name</label>
+    <input type="text" id="team-name-other" placeholder="Enter your team name" />
+  </div>
+  <div id="og-prefill-note" style="display:none;margin:-.4rem 0 .2rem;padding:.5rem .7rem;background:rgba(45,212,191,.08);border:1px solid rgba(45,212,191,.3);border-radius:7px;font-size:.76rem;color:#2dd4bf;"></div>
+
+  <div class="field">
+    <label>What does this team do and why does it matter?</label>
+    <textarea id="team-purpose" placeholder="e.g. Our worship team creates an environment where people can encounter God. We lead the congregation in song and set the tone for each service..."></textarea>
+  </div>
+
+  <div class="field">
+    <label>Why is it great to serve on this team?</label>
+    <textarea id="team-great" placeholder="e.g. This is one of the most tight-knit teams at Living Stones. Expect deep friendships, a lot of laughs, and the feeling that what you're doing actually matters every single Sunday..."></textarea>
+  </div>
+
+  <div class="two-col">
+    <div class="field">
+      <label>Team Leader Name</label>
+      <input type="text" id="leader-name" placeholder="Your name" />
+    </div>
+    <div class="field">
+      <label>Leader Phone / Text</label>
+      <input type="tel" id="leader-phone" placeholder="(775) 000-0000" />
+    </div>
+  </div>
+
+  <div class="field">
+    <label>Leader Email <span class="opt">(optional)</span></label>
+    <input type="email" id="leader-email" placeholder="name@lschurches.com" />
+  </div>
+
+  <div class="field">
+    <label class="check-item" style="text-transform:uppercase;font-size:.72rem;letter-spacing:.07em;font-weight:700;color:var(--muted);cursor:pointer">
+      <input type="checkbox" id="has-secondary" onchange="document.getElementById('secondary-fields').style.display=this.checked?'':'none'" style="width:16px;height:16px;accent-color:var(--accent);flex-shrink:0">
+      There is a secondary contact for this team
+    </label>
+  </div>
+
+  <div id="secondary-fields" style="display:none">
+    <div class="two-col">
+      <div class="field">
+        <label>Secondary Contact Name</label>
+        <input type="text" id="secondary-contact" placeholder="Name" />
+      </div>
+      <div class="field">
+        <label>Secondary Contact Phone</label>
+        <input type="tel" id="secondary-phone" placeholder="(775) 000-0000" />
+      </div>
+    </div>
+    <div class="field">
+      <label>Secondary Contact Email <span class="opt">(optional)</span></label>
+      <input type="email" id="secondary-email" placeholder="name@lschurches.com" />
+    </div>
+  </div>
+
+  <!-- ════════════════ COMMUNICATION ════════════════ -->
+  <div class="sec-title">How We Communicate</div>
+
+  <div class="field">
+    <label>Communication platforms we use (select all that apply)</label>
+    <div class="check-grid" style="margin-top:.4rem" id="comm-methods">
+      <label class="check-item"><input type="checkbox" value="Church Center Chat"> Church Center Chat</label>
+      <label class="check-item"><input type="checkbox" value="Email"> Email</label>
+      <label class="check-item"><input type="checkbox" value="Group Text"> Group Text</label>
+    </div>
+  </div>
+
+  <div class="field">
+    <label>How to access / join the group</label>
+    <input type="text" id="comm-join" placeholder="e.g. You'll be added to the Church Center group chat once you're set up. Text Brad at (775) 000-0000 if you're not in it." />
+  </div>
+
+  <div class="field">
+    <label>What gets shared + response expectation</label>
+    <textarea id="comm-details" placeholder="e.g. Schedule updates, prayer requests, last-minute changes, and team encouragement. Please respond within 24 hours when tagged or asked a direct question."></textarea>
+  </div>
+
+  <!-- ════════════════ SCHEDULE ════════════════ -->
+  <div class="sec-title">When We Serve</div>
+
+  <div class="field">
+    <label>Service days & times</label>
+    <textarea id="service-days" placeholder="e.g. Sunday mornings — 8:00 AM, 9:30 AM, and 11:00 AM services. We also serve at special events like Christmas, Easter, and occasional Friday nights..."></textarea>
+  </div>
+
+  <div class="two-col">
+    <div class="field">
+      <label>Arrival time</label>
+      <input type="text" id="arrival-time" placeholder="e.g. 45 min before service (8:45 AM for a 9:30 AM call)" />
+    </div>
+    <div class="field">
+      <label>Where to go when you arrive</label>
+      <input type="text" id="gather-spot" placeholder="e.g. Stage area, green room, lobby check-in table" />
+    </div>
+  </div>
+
+  <div class="field">
+    <label>Check-in process</label>
+    <input type="text" id="check-in" placeholder="e.g. Sign in on the volunteer clipboard at the sound booth, then let the team lead know you're here" />
+  </div>
+
+  <div class="field">
+    <label>Rehearsals / team meetings <span class="opt">(optional)</span></label>
+    <textarea id="rehearsals" placeholder="e.g. Wednesday nights 6:30–8:30 PM in the sanctuary. Attendance is expected unless you notify the team lead in advance..."></textarea>
+  </div>
+
+  <div class="field">
+    <label>Walk through a typical service day</label>
+    <textarea id="typical-day" style="min-height:110px" placeholder="e.g.&#10;8:45 AM — Arrive, sign in, grab coffee&#10;9:00 AM — Team prayer &amp; brief huddle&#10;9:10 AM — Soundcheck / setup / run-through&#10;9:30 AM — First service&#10;10:45 AM — 45-min break between services&#10;11:00 AM — Second service&#10;12:30 PM — Wrap up, quick debrief&#10;12:45 PM — Done!"></textarea>
+  </div>
+
+  <div class="two-col">
+    <div class="field">
+      <label>What to wear</label>
+      <input type="text" id="dress-code" placeholder="e.g. All black / business casual / team shirt" />
+    </div>
+    <div class="field">
+      <label>Parking <span class="opt">(optional)</span></label>
+      <input type="text" id="parking" placeholder="e.g. Back lot — leave front spots for guests" />
+    </div>
+  </div>
+
+  <div class="field">
+    <label>Pre-service prayer / huddle <span class="opt">(optional)</span></label>
+    <input type="text" id="huddle" placeholder="e.g. Team prayer 30 min before service in the green room" />
+  </div>
+
+  <div class="field">
+    <label>Anything to bring <span class="opt">(optional)</span></label>
+    <input type="text" id="bring-items" placeholder="e.g. Your instrument / Bible / we supply everything — just bring yourself!" />
+  </div>
+
+  <!-- ════════════════ PCO SCHEDULING ════════════════ -->
+  <div class="sec-title">Planning Center Scheduling</div>
+
+  <div class="pco-box">
+    <div class="pco-box-title">📱 How PCO Scheduling Works for Volunteers</div>
+    <p>The following standard PCO process will be included in the guide automatically. Add any team-specific details below.</p>
+    <ul class="pco-steps" style="margin-top:.6rem">
+      <li><span class="num">1.</span> You'll receive an <strong>invite to Planning Center</strong> via email — accept it to create your account.</li>
+      <li><span class="num">2.</span> Download <strong>Church Center</strong> (iOS / Android) and sign in. This is your main hub for your schedule.</li>
+      <li><span class="num">3.</span> When you're scheduled, you'll get a <strong>notification + email</strong> asking you to Accept or Decline.</li>
+      <li><span class="num">4.</span> <strong>Accept or Decline within 48 hours</strong> so we can fill any gaps quickly.</li>
+      <li><span class="num">5.</span> After accepting, your <strong>full plan</strong> (notes, song list, service order) is visible in the Church Center or PCO Services app.</li>
+    </ul>
+  </div>
+
+  <div class="field">
+    <label>How far in advance are schedules posted?</label>
+    <select id="sched-advance">
+      <option value="">Select one...</option>
+      <option>1 week in advance</option>
+      <option>2 weeks in advance</option>
+      <option>3–4 weeks in advance</option>
+      <option>Monthly at the start of each month</option>
+      <option>Quarterly / season at a time</option>
+    </select>
+  </div>
+
+  <div class="field">
+    <label>Does the schedule include resources volunteers should review? <span class="opt">(optional)</span></label>
+    <textarea id="sched-resources" placeholder="e.g. Yes — your plan in Planning Center will include the song list, chord charts, and any notes from the worship leader. Please review before Sunday."></textarea>
+  </div>
+
+  <div class="pco-box" style="margin-top:.5rem">
+    <div class="pco-box-title">📅 How to Block Out Dates in Church Center</div>
+    <p>This step-by-step will be included in the guide for volunteers:</p>
+    <ul class="pco-steps" style="margin-top:.5rem">
+      <li><span class="num">1.</span> Open the <strong>Church Center app</strong> on your phone.</li>
+      <li><span class="num">2.</span> Tap your <strong>profile picture</strong> (top right corner).</li>
+      <li><span class="num">3.</span> Tap <strong>"Serving"</strong> → then <strong>"Block Out Dates."</strong></li>
+      <li><span class="num">4.</span> Select the dates you're unavailable and tap <strong>Save.</strong></li>
+      <li><span class="num">5.</span> The scheduling team will automatically see these when building the schedule.</li>
+    </ul>
+  </div>
+
+  <div class="field" style="margin-top:.9rem">
+    <label>Additional scheduling notes <span class="opt">(optional)</span></label>
+    <textarea id="sched-notes" placeholder="e.g. We run an A/B rotation — you'll be on a consistent weekend each month. If something comes up, let us know ASAP and we'll work around it."></textarea>
+  </div>
+
+  <!-- ════════════════ ABSENCES & TRAINING ════════════════ -->
+  <div class="sec-title">Can't Make It + Getting Started</div>
+
+  <div class="field">
+    <label>If you can't make it — what should volunteers do?</label>
+    <textarea id="absence-policy" placeholder="e.g. Text the team lead ASAP — ideally 1 week in advance. Life happens and we get it! The earlier you let us know, the easier it is for us to find coverage. Don't just no-show — a heads up goes a long way."></textarea>
+  </div>
+
+  <div class="field">
+    <label>Training / onboarding for new volunteers</label>
+    <textarea id="training" placeholder="e.g. New volunteers shadow an experienced team member for 2–3 Sundays before serving independently. We'll pair you with a mentor your first few weeks — no pressure, just learning."></textarea>
+  </div>
+
+  <div class="two-col">
+    <div class="field">
+      <label>Background check required? <span class="opt">(optional)</span></label>
+      <select id="background-check">
+        <option value="">Select if applicable...</option>
+        <option>Yes — required before serving (we'll send the link)</option>
+        <option>Yes — required for Kids/Students ministry specifically</option>
+        <option>No — not required for this team</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Timeline to serve independently</label>
+      <input type="text" id="onboard-timeline" placeholder="e.g. 2–4 Sundays of shadowing, then you're on your own" />
+    </div>
+  </div>
+
+  <!-- ════════════════ TEAM CULTURE ════════════════ -->
+  <div class="sec-title">Team Culture</div>
+
+  <div class="field">
+    <label>Staff Values — The Four H's</label>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-top:.3rem">
+      <div class="pco-box" style="border-left-color:#c49a2e">
+        <div class="pco-box-title" style="font-size:.9rem;letter-spacing:.04em">H — Humble</div>
+        <p>We serve others before ourselves, never seeking the spotlight.</p>
+      </div>
+      <div class="pco-box" style="border-left-color:#c49a2e">
+        <div class="pco-box-title" style="font-size:.9rem;letter-spacing:.04em">H — Hungry</div>
+        <p>We're always growing, always learning, never settling for good enough.</p>
+      </div>
+      <div class="pco-box" style="border-left-color:#c49a2e">
+        <div class="pco-box-title" style="font-size:.9rem;letter-spacing:.04em">H — Happy</div>
+        <p>We serve with joy and gratitude, bringing gladness to the work and to each other.</p>
+      </div>
+      <div class="pco-box" style="border-left-color:#c49a2e">
+        <div class="pco-box-title" style="font-size:.9rem;letter-spacing:.04em">H — Honest</div>
+        <p>We tell the truth with grace and do the right thing, even when no one's watching.</p>
+      </div>
+    </div>
+    <p style="font-size:.72rem;color:var(--muted);margin-top:.5rem">These values are fixed and will appear in every guide — no edits needed.</p>
+  </div>
+
+  <div class="field">
+    <label>Personal welcome message from you</label>
+    <textarea id="welcome-message" placeholder="e.g. Hey! We are so glad you're joining this team. This is truly one of the most meaningful things I do every week, and I can't wait for you to experience it. Don't hesitate to reach out — no question is too small. Welcome to the family. — [Your name]"></textarea>
+  </div>
+
+  <div class="field">
+    <label>Anything else good to know? <span class="opt">(optional)</span></label>
+    <textarea id="anything-else" placeholder="e.g. Snacks in the green room on Sundays. We do a team dinner once a quarter. There's a team Spotify playlist — ask to be added!"></textarea>
+  </div>
+
+  <!-- ════════════════ ATTACHMENTS ════════════════ -->
+  <div class="sec-title">Supplementary Documents</div>
+
+  <div class="field">
+    <label>Upload SOPs, checklists, or other docs to include <span class="opt">(optional)</span></label>
+    <div class="upload-zone" id="upload-zone">
+      <input type="file" id="file-input" multiple accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.gif,.webp" onchange="handleFiles(this.files)" />
+      <div class="upload-zone-icon">📎</div>
+      <p><strong>Click to upload</strong> or drag files here</p>
+      <p style="margin-top:.2rem;font-size:.75rem">Images will appear in the guide · PDFs & docs listed by name</p>
+    </div>
+    <ul class="file-list" id="file-list"></ul>
+  </div>
+
+  <button class="generate-btn" onclick="openPreview()">Generate Onboarding Guide →</button>
+
+  <div class="save-row">
+    <button class="btn-secondary" onclick="saveGuide()">💾 Save to This Browser</button>
+    <button class="btn-secondary" onclick="exportGuideFile()">⬇ Export Guide File</button>
+    <label class="btn-secondary">
+      📂 Import Guide File
+      <input type="file" accept=".json,application/json" style="display:none" onchange="importGuideFile(this.files[0]); this.value='';">
+    </label>
+  </div>
+  <p class="saved-hint">Your work also auto-saves in this browser as you type, so a closed tab won't lose anything.</p>
+
+</div>
+
+<!-- ════════════════════════════════════════
+     PREVIEW OVERLAY + PDF
+════════════════════════════════════════ -->
+<div id="preview-overlay">
+  <div style="width:100%;max-width:740px;display:flex;flex-direction:column;">
+    <div class="preview-toolbar">
+      <h3>ONBOARDING GUIDE PREVIEW</h3>
+      <div class="tb-btns">
+        <button class="btn-sm btn-print" onclick="printGuide()">🖨 Print / Save PDF</button>
+        <button class="btn-sm btn-close" onclick="downloadWord()" style="color:var(--accent2)">⬇ Word (Editable)</button>
+        <button class="btn-sm btn-close" onclick="closePreview()">✕ Close</button>
+      </div>
+    </div>
+
+    <div id="pdf-doc">
+
+      <!-- COVER -->
+      <div class="doc-cover">
+        <div class="doc-cover-pattern"></div>
+        <div class="doc-cover-row">
+          <img class="doc-logo" id="d-logo" src="assets/ls-logo-white.png" alt="Living Stones Church">
+          <div class="doc-cover-right">
+            <div class="doc-eyebrow">Living Stones Church · South Reno</div>
+            <div class="doc-team-name" id="d-team-name">Team Name</div>
+            <div class="doc-subtitle" id="d-subtitle">Onboarding Guide</div>
+          </div>
+        </div>
+        <div class="doc-cover-foot">
+          <div class="doc-gold-bar"></div>
+          <div class="doc-leader-pill">👋 Led by <strong id="d-leader-cover" style="margin-left:.3rem"></strong></div>
+        </div>
+      </div>
+
+      <!-- BODY -->
+      <div class="doc-body">
+
+        <!-- Welcome -->
+        <div class="doc-welcome" id="d-welcome"></div>
+
+        <!-- About + Why Great -->
+        <div class="doc-sec">
+          <div class="doc-sec-title">About This Team</div>
+          <p class="doc-text" id="d-purpose"></p>
+          <div id="d-great-wrap" style="margin-top:.85rem;display:none">
+            <p style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#9a9490;margin-bottom:.35rem">Why It's Great to Serve Here</p>
+            <p class="doc-text" id="d-great"></p>
+          </div>
+        </div>
+
+        <!-- Contacts -->
+        <div class="doc-sec">
+          <div class="doc-sec-title">Your Key Contacts</div>
+          <div class="doc-cards" id="d-contacts"></div>
+        </div>
+
+        <div class="doc-divider"></div>
+
+        <!-- Communication -->
+        <div class="doc-sec">
+          <div class="doc-sec-title">How We Communicate</div>
+          <div id="d-comm"></div>
+        </div>
+
+        <div class="doc-divider"></div>
+
+        <!-- Schedule -->
+        <div class="doc-sec">
+          <div class="doc-sec-title">When We Serve</div>
+          <div id="d-schedule"></div>
+        </div>
+
+        <div class="doc-divider"></div>
+
+        <!-- PCO -->
+        <div class="doc-sec">
+          <div class="doc-sec-title">Planning Center — Your Schedule</div>
+          <div id="d-pco"></div>
+        </div>
+
+        <div class="doc-divider"></div>
+
+        <!-- Absences + Training -->
+        <div class="doc-sec">
+          <div class="doc-sec-title">Can't Make It? Getting Started?</div>
+          <div id="d-absence"></div>
+        </div>
+
+        <div class="doc-divider"></div>
+
+        <!-- Four H's — always present -->
+        <div class="doc-sec">
+          <div class="doc-sec-title">Our Staff Values — The Four H's</div>
+          <div class="h-grid">
+            <div class="h-card">
+              <div class="h-card-letter">H</div>
+              <div class="h-card-word">Humble</div>
+              <div class="h-card-desc">We serve others before ourselves, never seeking the spotlight.</div>
+            </div>
+            <div class="h-card">
+              <div class="h-card-letter">H</div>
+              <div class="h-card-word">Hungry</div>
+              <div class="h-card-desc">Always growing, always learning, never settling for good enough.</div>
+            </div>
+            <div class="h-card">
+              <div class="h-card-letter">H</div>
+              <div class="h-card-word">Happy</div>
+              <div class="h-card-desc">We serve with joy and gratitude, bringing gladness to the work and to each other.</div>
+            </div>
+            <div class="h-card">
+              <div class="h-card-letter">H</div>
+              <div class="h-card-word">Honest</div>
+              <div class="h-card-desc">We tell the truth with grace and do the right thing, even when no one's watching.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Extra notes / vibe -->
+        <div class="doc-sec" id="d-extra-sec" style="display:none">
+          <div class="doc-sec-title">Good to Know</div>
+          <div id="d-extra"></div>
+        </div>
+
+        <!-- Attachments -->
+        <div class="doc-sec" id="d-attach-sec" style="display:none">
+          <div class="doc-divider"></div>
+          <div class="doc-sec-title">📎 Supplementary Documents</div>
+          <div id="d-attachments"></div>
+        </div>
+
+      </div>
+
+      <div class="doc-footer">
+        <span id="d-footer-team"></span>
+        <span class="doc-footer-logo">LIVING STONES CHURCH · SOUTH RENO</span>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// ── FILE STORE ──
+const uploadedFiles = []; // { name, type, dataUrl }
+
+function handleFiles(files) {
+  [...files].forEach(file => {
+    if (uploadedFiles.find(f => f.name === file.name)) return;
+    const entry = { name: file.name, type: file.type, dataUrl: null };
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = e => { entry.dataUrl = e.target.result; renderFileList(); scheduleDraftSave(); };
+      reader.readAsDataURL(file);
+    }
+    uploadedFiles.push(entry);
+    renderFileList();
+  });
+  scheduleDraftSave();
+}
+
+function removeFile(name) {
+  const i = uploadedFiles.findIndex(f => f.name === name);
+  if (i > -1) uploadedFiles.splice(i, 1);
+  renderFileList();
+  scheduleDraftSave();
+}
+
+function renderFileList() {
+  const ul = document.getElementById('file-list');
+  ul.innerHTML = uploadedFiles.map(f =>
+    `<li>
+      <span>${f.type.startsWith('image/') ? '🖼 ' : '📄 '}${esc(f.name)}</span>
+      <button onclick="removeFile('${esc(f.name)}')" title="Remove">✕</button>
+    </li>`
+  ).join('');
+}
+
+// ── Prefill a team's guide from what the church already knows ─────────────────
+// Sources: dashboard-data.json (Point Leader from the Leader Forms, Sunday plans →
+// which gatherings this team serves, team size), team-checklists.js (the team's Sunday
+// checklist → the "typical service day" walkthrough, arrival, huddle, what to wear), the
+// team profiles below (purpose / why it's great, written for LSSR), and — only for staff
+// (admin) or the leader themselves (last 4 of their phone) — leader + secondary contact
+// info from Planning Center via the onboarding web app.
+// Only EMPTY fields (or fields still holding an earlier prefill) are filled, so nothing a
+// leader typed is ever overwritten; "Refill" overwrites on purpose.
+const OG_VISION = 'Helping Everyone Find Everything in Jesus';
+const OG_TEAMS = {
+  'Worship Team': { ck: 'worship team', form: 'Worship & Tech', pco: 'Worship Team',
+    purpose: 'We lead our church family in worshiping Jesus together every Sunday. Before a word is preached, the songs we sing tell the story of who God is and what He has done — so we lead with authenticity, not performance, pointing every person in the room to Jesus. It is one of the clearest ways we live out ' + OG_VISION + '.',
+    great: 'You get to use the gifts God gave you to help people encounter Him — and do it alongside a humble, hungry, happy crew who pray together, grow together, and genuinely enjoy each other. Expect real friendships and a team that cares about your walk with Jesus as much as your playing.',
+    arrival: '90 minutes before the first gathering you serve — production meeting at 7:30 AM with Tech, Presiders, and the Preacher',
+    rehearsals: 'Mid-week Worship Team rehearsal plus a pre-service rehearsal on Sunday morning — both are on your plan in Planning Center.',
+    bring: 'Your instrument and gear, ready to go (in-ear packs/monitor needs covered with Tech)' },
+  'Tech Team': { ck: 'tech', form: 'Worship & Tech', pco: 'Tech',
+    purpose: 'We run sound, lights, slides, and livestream so nothing gets between people and the message of Jesus. When tech is done well it disappears — the words are on the screen right on time, the mix is clear, and people at home can join in. Quiet, behind-the-scenes excellence that serves ' + OG_VISION + '.',
+    great: 'You will learn real production skills from people who love teaching them, and you get a front-row seat to how God moves every Sunday. It is a tight-knit booth crew — lots of laughs, clear roles, and the satisfaction of a service that ran smoothly because of you.',
+    arrival: '90+ minutes before the first gathering you serve — production meeting at 7:30 AM with Worship, Presiders, and the Preacher',
+    rehearsals: 'Mid-week Tech rehearsal plus a pre-service rehearsal on Sunday morning — both are on your plan in Planning Center.' },
+  'First Impressions': { ck: 'first impressions', form: 'First Impressions', pco: 'First Impressions',
+    purpose: 'We are the first face of Living Stones. Before someone hears a song or a sermon, they meet us at the door — and a warm, genuine welcome tells them they belong here. Many guests decide in the first few minutes whether they will come back, so we get to open the door (literally) to people finding everything in Jesus.',
+    great: 'It is simple, joyful, and it matters: a smile, a handshake, and learning people\'s names. You will get to know the whole church family, spot new faces, and serve with a happy team — and you are dismissed to enjoy most of the service.',
+    arrival: 'By 7:30 AM, prepped and ready — with your lanyard/badge on',
+    dress: 'Wear your lanyard / name badge' },
+  'Connection Team': { ck: 'connect', form: 'Connection Team', pco: 'Connection Team',
+    purpose: 'We are the hub of information at Living Stones — the people a guest can walk up to with any question. We help people take their next step: a community group, a class, serving, an upcoming event. Every conversation at our desk is a chance to connect someone to finding everything in Jesus.',
+    great: 'You get to have real conversations with guests and help them feel known right away — and you will know everything that is going on at church before anyone else. It is relational, flexible, and you will see people you helped take a next step become family.',
+    arrival: '30 minutes before your gathering (7:30 AM for the 8:00) to set up the desk — wear your lanyard',
+    gather: 'The Connect desk in the lobby — desk items are in the cubbies behind the door in the Wolf Pack room',
+    dress: 'Wear your lanyard / name badge' },
+  'Hospitality Team': { ck: 'hospitality team', form: 'Hospitality', pco: 'Hospitality Team',
+    purpose: 'We make sure no one sits alone. Spread across the worship center, we welcome people, talk with them, and help them feel at home and cared about — especially anyone who looks new or by themselves. Authentic community starts with someone noticing you, and that is how we help people find everything in Jesus.',
+    great: 'It is the easiest team to join and one of the most meaningful: you just love people well for 15 minutes, then sit down and worship. You will make friends, meet new families, and be the reason someone comes back.',
+    arrival: '15 minutes before the start of your gathering' },
+  'Coffee Team': { ck: 'coffee team', form: 'Coffee Team', pco: 'Coffee Team',
+    purpose: 'We serve coffee, and with it, hospitality. A hot cup in someone\'s hand makes the lobby feel like a living room and gives people a reason to linger and talk. We create the space where authentic community happens before and after every gathering.',
+    great: 'It is hands-on, practical, and social — you will be in the middle of the lobby buzz every Sunday. Setup and teardown crews each have a clear job, and it is a great team for friends or families to serve on together.',
+    arrival: '60 minutes before your gathering to stock supplies and brew the first round' },
+  'Breakfast Team': { ck: 'breakfast team', form: 'Breakfast Team', pco: 'Breakfast Team',
+    purpose: 'We feed the volunteers who serve the church. A hot breakfast for the early crews says "we see you and we\'re grateful for you," and it fuels the people who make Sunday happen. It is faith that cares, one plate at a time.',
+    great: 'If you love to cook, this is your team. You serve behind the scenes, bless dozens of volunteers every week, and coordinate a menu with a fun, generous group.',
+    arrival: 'By 7:00 AM with breakfast fully cooked (hot breakfast for about 30 people)',
+    bring: 'Your fully cooked dish for the menu you coordinated with the team' },
+  'Parking Team': { ck: 'parking', form: 'Parking', pco: 'Parking Team',
+    purpose: 'We are the very first welcome anyone gets — before the doors, before the lobby, right as they turn into the lot. We keep traffic safe and moving and make arriving at church easy, especially for guests who have never been here. A great first minute helps people find everything in Jesus.',
+    great: 'Fresh air, high-fives, and a crew that loves being outside together. You make a huge difference in a short amount of time, and you are often the first smile a guest sees.',
+    arrival: '60 minutes before your gathering to grab your vest/flag and set cones',
+    checkin: 'Get your vest and flag, then confirm your post with the Parking lead',
+    dress: 'Weather-appropriate clothes — you will be outside; wear your team vest' },
+  'Safety Team': { ck: 'safety', form: 'Safety Team', pco: 'Safety Team',
+    purpose: 'We keep people safe so they can focus on Jesus. From the children\'s wing to the parking lot, we are a calm, unobtrusive presence that protects our kids, our guests, and our church family. Faith that cares means caring for people\'s safety too.',
+    great: 'You serve with a trained, trusted team, learn real skills (radios, first aid, awareness), and give parents peace of mind every Sunday. It is serving that quietly makes everything else possible.',
+    arrival: 'At least 15 minutes before your gathering — 7:00 AM if you can make pre-service prayer',
+    checkin: 'Pick up your radio from the kitchen cabinet and do a radio check with the team; know your assigned post',
+    dress: 'Your purple lanyard name badge; the safety shirt is encouraged but not required' },
+  'Prayer Team': { ck: 'prayer team', form: 'Prayer Team', pco: 'Prayer Team',
+    purpose: 'We cover every gathering in prayer. While the service happens, we intercede for the preacher, the people in the room, and the work God is doing — because nobody finds everything in Jesus without His Spirit at work. Our pursuit of God fuels everything else.',
+    great: 'You get to partner with God in the most important work of Sunday. It is quiet, focused, and deeply encouraging — and you will see prayers answered in the lives of people you prayed for.',
+    arrival: '10 minutes before your gathering, at the designated prayer location',
+    gather: 'The designated prayer room / location',
+    resources: 'The During-Service Prayer Prompts on the back of the Prayer Team sign — updated weekly with scripture.' },
+  'Enrichment': { ck: 'enrichment', form: 'Enrichment', pco: 'Enrichment Teams',
+    purpose: 'We serve communion and receive the offering — two moments where the whole church responds to Jesus together. We prepare the elements, serve every person with the words "His body broken and blood shed for you," and reset the room between gatherings so it is ready for the next group of people.',
+    great: 'Few things are as meaningful as looking someone in the eye and handing them communion. You serve as a team, take communion together afterward, and help every gathering run with reverence and care.',
+    arrival: '7:00 AM for the first gathering (communion prep); otherwise before your gathering starts' },
+  'Stepping Stones (Kids)': { ck: 'stepping stones', form: 'Stepping Stones', pco: 'Stepping Stones',
+    purpose: 'We help kids find everything in Jesus. Every Sunday we teach children the truth of the Bible that points to Jesus, in safe, fun, well-prepared classrooms — so parents can worship knowing their kids are loved and learning. We are planting seeds of faith that last a lifetime.',
+    great: 'Kids are hilarious, honest, and hungry to learn — and you get to be a trusted adult who shows them Jesus. You will have a clear curriculum, supportive team leads, and the joy of watching kids grow in their faith week after week.',
+    arrival: 'At least 15 minutes before your gathering (Team Leads arrive at 7:00 AM for prayer and setup)',
+    checkin: 'Check in with the Team Lead — attendance is taken in the Services app starting at 7:45 AM',
+    resources: 'The lesson curriculum is posted in Church Center — plan 30–60 minutes each Thursday to review it.',
+    bg: 'Yes — required for Kids/Students ministry specifically' },
+  'LS Students': { ck: 'ls students', form: 'LS Students', pco: 'LS Students',
+    purpose: 'We help students find everything in Jesus during the years they are deciding what they believe. Games, a talk, and small-group discussion create a place where students are known, challenged, and loved — and where their faith becomes their own.',
+    great: 'You get to be the adult a student remembers. Students are real, fun, and full of questions, and you will lead a small group, build genuine relationships, and see God work in the next generation.',
+    arrival: '30 minutes before the 9:30 gathering to connect with the Students director',
+    checkin: 'Connect with the Students director when you arrive',
+    bg: 'Yes — required for Kids/Students ministry specifically' },
+  'Service Captains': { ck: 'service captains', form: 'Service Captains', pco: 'Service Captains',
+    purpose: 'We make sure Sunday is ready before anyone arrives: signs out, doors open, rooms set, and every team supported through the morning. We carry the whole campus so every other team — and every guest — can focus on meeting Jesus.',
+    great: 'You see the whole Sunday come together and get to be the person everyone counts on. It is practical leadership with a great crew, and you will know every corner of the building (and every team) by name.',
+    arrival: '6:30 AM for setup (pre-service prayer at 7:00 AM)',
+    skipPhases: /notes\s*&\s*supplies/i },
+  'Presiders Team': { ck: 'presiders team', form: '', pco: 'Presiders',
+    purpose: 'We guide the church through each gathering — welcomes, scripture readings, transitions, communion, and next steps — so the service flows and people know how to respond to Jesus. We help every guest understand what is happening and where to go next.',
+    great: 'You get to shepherd the whole room for a morning, use your voice to point people to Jesus, and serve closely with the Worship, Tech, and preaching teams.',
+    arrival: '7:30 AM for the production meeting with Tech, Worship, and the Preacher' }
+};
+const OG_DEFAULT_ABSENCE = 'Decline the request in Planning Center (or block out the date in Church Center) as soon as you know, and text your team leader so we can find coverage. Life happens — an early heads-up is all we ask.';
+let _ogTeamData = null, _ogPrefilled = {}, _ogContactTeam = '';
+function ogNormTeam(s) {
+  return String(s || '').toLowerCase().replace(/\(kids\)/g, '').replace(/teams?/g, '').replace(/[^a-z]/g, '').replace(/^connection$/, 'connect');
+}
+function ogLoadTeamData() {
+  if (ogIsAdmin()) _ogPw = ogToken();
+  fetch('./dashboard-data.json?v=' + Date.now(), { cache: 'no-store' })
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(d){ if (d) { _ogTeamData = d; const cur = val('team-name'); if (cur && cur !== 'Other') ogPrefillFromTeam(cur); } })
+    .catch(function(){});
+}
+function ogProfile(name) { return OG_TEAMS[name] || null; }
+function ogFindTeam(name) {
+  if (!_ogTeamData) return null;
+  const prof = ogProfile(name), forms = _ogTeamData.teamsLeaderForms || [], serve = _ogTeamData.serveTeams || [];
+  const keys = [prof && prof.form, prof && prof.pco, name].filter(Boolean).map(ogNormTeam);
+  const form = forms.filter(function(f){ return keys.indexOf(ogNormTeam(f.n)) !== -1; })[0] || null;
+  const st   = serve.filter(function(s){ return keys.indexOf(ogNormTeam(s.name)) !== -1; })[0] || null;
+  return (form || st) ? { form: form, serve: st } : null;
+}
+// Which gatherings this team serves, from the Sunday plans in Planning Center.
+function ogServiceTimes(name) {
+  const prof = ogProfile(name); if (!_ogTeamData || !prof) return null;
+  const key = ogNormTeam(prof.pco), tm = {}, all = {}; let n = 0, allN = 0, rehearsal = false;
+  (_ogTeamData.sundayPlans || []).forEach(function(p) { (p.services || []).forEach(function(s) { (s.volunteers || []).forEach(function(v) {
+    ['8 AM', '9:30 AM', '11 AM'].forEach(function(t) { all[t] = 1; });
+    if (ogNormTeam(v.team) !== key) return;
+    const ts = (String(v.serviceTime || '').match(/\d{1,2}(?::\d{2})?\s*[ap]m/ig) || []).map(function(t){ return t.toUpperCase().replace(/\s+/g, ' '); });
+    if (/rehears/i.test(v.serviceTime || '')) rehearsal = true;
+    if (!ts.length) return;
+    n++; if (ts.length >= 3) allN++;
+    ts.forEach(function(t){ tm[t] = (tm[t] || 0) + 1; });
+  }); }); });
+  const order = function(t) { const m = t.match(/(\d{1,2})(?::(\d{2}))?\s*(AM|PM)/); let h = +m[1] % 12 + (m[3] === 'PM' ? 12 : 0); return h * 60 + (+m[2] || 0); };
+  const times = Object.keys(tm).sort(function(a, b){ return order(a) - order(b); });
+  const gatherings = Object.keys(all).sort(function(a, b){ return order(a) - order(b); });
+  return { times: times, gatherings: gatherings, everyone: n > 0 && allN / n > 0.6, rehearsal: rehearsal };
+}
+function ogPretty(t) { return t.replace(/^(\d{1,2}) (AM|PM)$/, '$1:00 $2'); }
+function ogJoin(list) { return list.length <= 1 ? list.join('') : list.slice(0, -1).join(', ') + ' & ' + list[list.length - 1]; }
+function ogServiceDaysText(name) {
+  const st = ogServiceTimes(name), prof = ogProfile(name);
+  if (!st || !st.times.length) {
+    if (name === 'LS Students') return 'Sunday mornings during the 9:30 AM gathering.';
+    if (prof && /worship|tech/i.test(prof.pco)) return 'Sunday mornings — all three gatherings (8:00, 9:30 & 11:00 AM) — plus rehearsals that are on your Planning Center plan.';
+    return '';
+  }
+  const t = st.times.map(ogPretty);
+  let s = 'Sunday mornings — ';
+  if (st.everyone) s += 'our team serves all ' + (t.length === 3 ? 'three ' : '') + 'gatherings (' + ogJoin(t) + ').';
+  else s += 'we serve the ' + ogJoin(t) + ' gathering' + (t.length > 1 ? 's' : '') + '. Most people serve one gathering a Sunday — your exact time is on your schedule in Planning Center.';
+  if (st.rehearsal) s += ' Rehearsals are on your plan in Planning Center too.';
+  s += ' We also serve at special gatherings like Christmas and Easter.';
+  return s;
+}
+// The team's Sunday checklist, reformatted as a walkthrough (grouped by phase, time — task).
+function ogChecklist(name) {
+  const prof = ogProfile(name), all = window.LSSR_TEAM_CHECKLISTS || {};
+  return (prof && all[prof.ck]) || null;
+}
+function ogWalkthrough(name) {
+  const items = ogChecklist(name), prof = ogProfile(name); if (!items) return '';
+  const st = ogServiceTimes(name), out = [];
+  if (st && st.gatherings && st.gatherings.length) out.push('Our Sunday: gatherings at ' + ogJoin(st.gatherings.map(ogPretty)) + ' (about an hour each).');
+  let phase = '';
+  items.forEach(function(it) {
+    if (/^(mission)$/i.test(it.phase) || (prof.skipPhases && prof.skipPhases.test(it.phase))) return;
+    if (it.phase !== phase) { phase = it.phase; out.push(''); out.push(phase + ':'); }
+    const time = String(it.time || '').trim();
+    out.push((time && time !== '—' ? time + ' — ' : '') + it.text);
+  });
+  return out.join('\n').replace(/^\n+/, '').trim();
+}
+function ogFromChecklist(name, re, skip) {
+  const items = ogChecklist(name) || [], prof = ogProfile(name);
+  const hit = items.filter(function(it){ return re.test(it.text) && !(skip && skip.test(it.phase)) && !(prof.skipPhases && prof.skipPhases.test(it.phase)); })[0];
+  return hit ? ((hit.time && hit.time !== '—' && /\d/.test(hit.time) ? hit.time + ' — ' : '') + hit.text) : '';
+}
+// Everything we can fill for a team (contact info is added separately, when allowed).
+function ogPrefillValues(name) {
+  const prof = ogProfile(name), match = ogFindTeam(name), v = {};
+  if (!prof) { if (match && match.form && match.form.l) v['leader-name'] = match.form.l; return v; }
+  v['team-purpose'] = prof.purpose;
+  v['team-great'] = prof.great;
+  if (match && match.form && match.form.l) v['leader-name'] = match.form.l;
+  v['service-days'] = ogServiceDaysText(name);
+  v['arrival-time'] = prof.arrival || '';
+  if (prof.gather) v['gather-spot'] = prof.gather;
+  if (prof.checkin) v['check-in'] = prof.checkin;
+  if (prof.rehearsals) v['rehearsals'] = prof.rehearsals;
+  v['typical-day'] = ogWalkthrough(name);
+  v['dress-code'] = prof.dress || '';
+  // Pre-service prayer: the team's own checklist line when it has a clean one, else the all-volunteer 7:00 AM prayer.
+  const hud = prof.huddle || ogFromChecklist(name, /^(arrive for )?pre-service prayer|^gather with the team for pre-service prayer|pray together|team prayer/i, /during|after|week|emergency|before sunday/i);
+  v['huddle'] = hud || '7:00 AM pre-service prayer — every volunteer is welcome, and anyone serving the 8:00 gathering is especially encouraged to join';
+  if (prof.bring) v['bring-items'] = prof.bring;
+  if (prof.resources) v['sched-resources'] = prof.resources;
+  if (prof.bg) v['background-check'] = prof.bg;
+  v['absence-policy'] = OG_DEFAULT_ABSENCE;
+  return v;
+}
+function ogApply(id, value, force) {
+  const el = document.getElementById(id); if (!el || !value) return false;
+  const cur = el.value || '';
+  if (!force && cur && cur !== _ogPrefilled[id]) return false;   // the leader typed something — leave it
+  if (el.tagName === 'SELECT' && ![...el.options].some(function(o){ return (o.value || o.text) === value; })) return false;
+  el.value = value; _ogPrefilled[id] = value;
+  if (el.tagName === 'TEXTAREA') { el.style.height = 'auto'; el.style.height = Math.max(el.scrollHeight, 60) + 'px'; }
+  return true;
+}
+function ogPrefillFromTeam(name, force) {
+  const note = document.getElementById('og-prefill-note');
+  if (!name || name === 'Other') { if (note) note.style.display = 'none'; return; }
+  // Clear an earlier team's untouched prefill before filling this one.
+  if (_ogPrefilled._team && _ogPrefilled._team !== name) Object.keys(_ogPrefilled).forEach(function(id) { const el = document.getElementById(id); if (id !== '_team' && el && el.value === _ogPrefilled[id]) el.value = ''; });
+  if (_ogPrefilled._team !== name) _ogPrefilled = { _team: name };
+  const vals = ogPrefillValues(name), filled = [];
+  Object.keys(vals).forEach(function(id) { if (ogApply(id, vals[id], force)) filled.push(id); });
+  const match = ogFindTeam(name);
+  let ctx = '';
+  if (match && match.serve && (match.serve.current != null || match.serve.needed != null)) ctx = 'Planning Center shows ~' + (match.serve.current || 0) + ' serving' + (match.serve.needed != null ? ' (goal ~' + match.serve.needed + ').' : '.');
+  if (note) {
+    note.innerHTML = (filled.length || Object.keys(vals).length
+      ? '&#10003; Prefilled ' + (filled.length ? filled.length + ' section' + (filled.length === 1 ? '' : 's') : 'this team') + ' from Planning Center, the team checklist, and our Sunday schedule. ' + ctx + ' <span style="color:var(--muted)">Edit anything below.</span>' +
+        ' <a href="#" onclick="ogRefill();return false" style="color:#2dd4bf;font-weight:700">Refill everything</a>'
+      : ctx) + '<div id="og-contact-box" style="margin-top:.45rem"></div>';
+    note.style.display = '';
+  }
+  scheduleDraftSave();
+  ogLoadContacts(name);
+}
+function ogRefill() {
+  const name = currentTeamSelect(); if (!name) return;
+  if (!confirm('Replace every prefilled section with fresh info from Planning Center and the team checklist?\n\nAnything you typed in those sections will be replaced.')) return;
+  ogPrefillFromTeam(name, true);
+}
+function currentTeamSelect() { const v = val('team-name'); return v && v !== 'Other' ? v : ''; }
+// Leader + secondary contact from Planning Center — staff (admin) or the leader (last 4 of phone).
+function ogContactParams(name, extra) {
+  const prof = ogProfile(name) || {}, match = ogFindTeam(name);
+  const q = { action: 'og_team_contact', team: prof.form || (match && match.form && match.form.n) || prof.pco || name, pcoTeam: prof.pco || name, leader: (match && match.form && match.form.l) || '' };
+  return Object.keys(Object.assign(q, extra || {})).map(function(k){ return k + '=' + encodeURIComponent(q[k]); }).join('&');
+}
+function ogLoadContacts(name, verify) {
+  const box = document.getElementById('og-contact-box'); if (!box) return;
+  let saved = ''; try { saved = sessionStorage.getItem('og_v_' + ogNormTeam(name)) || ''; } catch (e) {}
+  verify = verify || saved;
+  const extra = _ogPw ? { pw: _ogPw } : Object.assign(ogToken() ? { token: ogToken() } : {}, verify ? { verify: verify } : {});
+  _ogContactTeam = name;
+  box.innerHTML = '<span style="color:var(--muted)">Looking up contact info in Planning Center…</span>';
+  fetch(OG_WEBAPP_URL + '?' + ogContactParams(name, extra) + '&t=' + Date.now()).then(function(r){ return r.json(); }).then(function(res) {
+    if (_ogContactTeam !== name) return;
+    if (!res || !res.ok) { box.innerHTML = ''; return; }
+    const p = res.primary, s = res.secondary;
+    if (!res.locked) {
+      const got = [];
+      if (p) { if (!val('leader-name') || val('leader-name') === _ogPrefilled['leader-name']) ogApply('leader-name', p.name, true); if (ogApply('leader-phone', p.phone)) got.push('phone'); if (ogApply('leader-email', p.email)) got.push('email'); }
+      if (s) {
+        const cb = document.getElementById('has-secondary');
+        if (ogApply('secondary-contact', s.name)) got.push('secondary contact');
+        ogApply('secondary-phone', s.phone); ogApply('secondary-email', s.email);
+        if (cb && val('secondary-contact')) { cb.checked = true; document.getElementById('secondary-fields').style.display = ''; }
+      }
+      if (verify && !_ogPw) { try { sessionStorage.setItem('og_v_' + ogNormTeam(name), verify); } catch (e) {} }
+      box.innerHTML = got.length ? '&#10003; Contact info filled in (' + got.join(', ') + ').' : (p || s ? '&#10003; Contact info is up to date.' : '');
+      scheduleDraftSave();
+      return;
+    }
+    if (verify && !_ogPw) { try { sessionStorage.removeItem('og_v_' + ogNormTeam(name)); } catch (e) {} }
+    if (p && p.name && !val('leader-name')) ogApply('leader-name', p.name);
+    if (!p || !res.canVerify) {
+      box.innerHTML = s ? '<span style="color:var(--muted)">Secondary contact on file in Planning Center: ' + esc(s.name) + '. Staff can fill contact details from the Admin panel.</span>' : '';
+      return;
+    }
+    box.innerHTML = '<span>Are you ' + esc(p.name) + '? Enter the <b>last 4 digits of your phone</b> to fill in your contact info' + (s ? ' (and ' + esc(s.name) + ' as secondary contact)' : '') + ':</span> ' +
+      '<input id="og-verify" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="1234" style="width:70px;padding:.25rem .45rem;margin:0 .3rem;border-radius:6px;border:1px solid rgba(45,212,191,.4);background:transparent;color:inherit" onkeydown="if(event.key===\'Enter\')ogVerify()">' +
+      '<button type="button" onclick="ogVerify()" style="padding:.25rem .7rem;border-radius:6px;border:1px solid #2dd4bf;background:rgba(45,212,191,.15);color:#2dd4bf;font-weight:700;cursor:pointer">Fill in</button>' +
+      (verify ? ' <span style="color:#f87171">That didn’t match — try again.</span>' : '');
+  }).catch(function() { if (_ogContactTeam === name) box.innerHTML = ''; });
+}
+function ogVerify() {
+  const v = (document.getElementById('og-verify') || {}).value || '', name = currentTeamSelect();
+  if (!/^\d{4}$/.test(v.trim()) || !name) return;
+  ogLoadContacts(name, v.trim());
+}
+
+function handleTeamSelect(v) {
+  document.getElementById('team-name-other-wrap').style.display = v === 'Other' ? '' : 'none';
+  if (v !== 'Other') document.getElementById('team-name-other').value = '';
+  if (v && v !== 'Other') ogPrefillFromTeam(v);
+  else { const note = document.getElementById('og-prefill-note'); if (note) note.style.display = 'none'; }
+}
+
+// drag-and-drop on upload zone
+function initDropZone() {
+  const zone = document.getElementById('upload-zone');
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.style.borderColor = 'var(--accent)'; });
+  zone.addEventListener('dragleave', () => { zone.style.borderColor = ''; });
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.style.borderColor = '';
+    handleFiles(e.dataTransfer.files);
+  });
+}
+
+function val(id) { return (document.getElementById(id)||{}).value||''; }
+function checked(id) { return [...document.querySelectorAll('#'+id+' input:checked')].map(c=>c.value); }
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function block(label, text) {
+  if (!text.trim()) return '';
+  return '<p style="margin-bottom:.65rem;font-size:.87rem;line-height:1.7;color:#2e2a26"><strong style="color:#2e2a26">'+esc(label)+':</strong> '+esc(text)+'</p>';
+}
+function blockArea(label, text) {
+  if (!text.trim()) return '';
+  return '<div style="margin-bottom:.75rem"><p style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#9a9490;margin-bottom:.3rem">'+esc(label)+'</p><p class="doc-text">'+esc(text)+'</p></div>';
+}
+function bullets(text) {
+  if (!text.trim()) return '';
+  const lines = text.split('\n').filter(l=>l.trim());
+  if (lines.length<2) return '<p class="doc-text">'+esc(text)+'</p>';
+  return '<ul class="doc-list">'+lines.map(l=>'<li>'+esc(l.replace(/^[•\-\*]\s*/,''))+'</li>').join('')+'</ul>';
+}
+function bulletLines(text) {
+  if (!text.trim()) return '';
+  const lines = text.split('\n').filter(l=>l.trim());
+  // Strip only bullet markers ("• ", "- ", "* ", "1. ", "1) ") — never digits
+  // that are part of the content, like the "9" in "9:10 - At Post".
+  // A line ending in ":" (e.g. "Pre-Service Prep:") is a sub-heading for the lines under it.
+  let html = '', open = false;
+  lines.forEach(l => {
+    const t = l.trim();
+    if (/:$/.test(t) && !/ — /.test(t) && t.length < 70) { if (open) { html += '</ul>'; open = false; } html += '<p style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#6b6560;margin:.55rem 0 .2rem">'+esc(t.replace(/:$/,''))+'</p>'; return; }
+    if (!open) { html += '<ul class="doc-list">'; open = true; }
+    html += '<li>'+esc(t.replace(/^(?:[•\-\*]+|\d+[\.\)])\s+/,''))+'</li>';
+  });
+  return html + (open ? '</ul>' : '');
+}
+function card(lbl,v) {
+  if (!v) return '';
+  return '<div class="doc-card"><div class="doc-card-lbl">'+lbl+'</div><div class="doc-card-val">'+esc(v)+'</div></div>';
+}
+function tip(icon, text) {
+  return '<div class="doc-tip"><span style="flex-shrink:0">'+icon+'</span><span>'+esc(text)+'</span></div>';
+}
+// Same tip box, but with a bold lead-in label so the value has context
+// (e.g. "Background check: No — not required for this team").
+function tipLabeled(icon, label, text) {
+  return '<div class="doc-tip"><span style="flex-shrink:0">'+icon+'</span>' +
+         '<span><strong>'+esc(label)+':</strong> '+esc(text)+'</span></div>';
+}
+function stepBox(title, steps) {
+  return '<div class="doc-step-box"><div class="doc-step-box-title">'+title+'</div><ol class="doc-steps">'+steps.map((s,i)=>'<li><span class="step-n">'+(i+1)+'</span><span>'+s+'</span></li>').join('')+'</ol></div>';
+}
+
+function openPreview() {
+  const teamSel  = val('team-name');
+  const team     = teamSel === 'Other' ? (val('team-name-other')||'Our Team') : (teamSel||'Our Team');
+  const purpose  = val('team-purpose');
+  const great    = val('team-great');
+  const lName    = val('leader-name');
+  const lPhone   = val('leader-phone');
+  const lEmail   = val('leader-email');
+  const hasSec   = document.getElementById('has-secondary').checked;
+  const sec      = hasSec ? val('secondary-contact') : '';
+  const secPh    = hasSec ? val('secondary-phone') : '';
+  const secEmail = hasSec ? val('secondary-email') : '';
+
+  const commM    = checked('comm-methods');
+  const commJoin = val('comm-join');
+  const commDets = val('comm-details');
+
+  const svcDays  = val('service-days');
+  const arrival  = val('arrival-time');
+  const gSpot    = val('gather-spot');
+  const checkIn  = val('check-in');
+  const rehearse = val('rehearsals');
+  const typDay   = val('typical-day');
+  const dress    = val('dress-code');
+  const parking  = val('parking');
+  const huddle   = val('huddle');
+  const bring    = val('bring-items');
+
+  const schedAdv = val('sched-advance');
+  const schedRes = val('sched-resources');
+  const schedN   = val('sched-notes');
+
+  const absence  = val('absence-policy');
+  const training = val('training');
+  const bgCheck  = val('background-check');
+  const timeline = val('onboard-timeline');
+
+  const welcome  = val('welcome-message');
+  const extra    = val('anything-else');
+
+  // COVER
+  document.getElementById('d-team-name').textContent = team;
+  document.getElementById('d-leader-cover').textContent = lName || 'Your Team Leader';
+  // Absolute URL so the logo also resolves inside the print frame
+  document.getElementById('d-logo').src = new URL('assets/ls-logo-white.png', location.href).href;
+
+  // WELCOME
+  document.getElementById('d-welcome').innerHTML = welcome
+    ? esc(welcome)
+    : 'Welcome to the '+esc(team)+'! We\'re so glad you\'re here. This guide covers everything you need to know to get started serving with us.';
+
+  // PURPOSE + GREAT
+  document.getElementById('d-purpose').textContent = purpose || 'This team serves Living Stones Church with excellence and joy.';
+  if (great) {
+    document.getElementById('d-great').textContent = great;
+    document.getElementById('d-great-wrap').style.display = '';
+  } else {
+    document.getElementById('d-great-wrap').style.display = 'none';
+  }
+
+  // CONTACTS
+  let c = '';
+  if (lName)    c += card('Team Leader', lName);
+  if (lPhone)   c += card('Phone / Text', lPhone);
+  if (lEmail)   c += card('Email', lEmail);
+  if (sec)      c += card('Secondary Contact', sec);
+  if (secPh)    c += card('Secondary Phone', secPh);
+  if (secEmail) c += card('Secondary Email', secEmail);
+  document.getElementById('d-contacts').innerHTML = c || card('Contact','See your team leader for details');
+
+  // COMMUNICATION
+  let comm = '';
+  if (commM.length) {
+    comm += '<div style="margin-bottom:.65rem"><p style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#9a9490;margin-bottom:.35rem">Platforms We Use</p><ul class="doc-list">'+commM.map(m=>'<li>'+esc(m)+'</li>').join('')+'</ul></div>';
+  }
+  if (commJoin)  comm += blockArea('How to Access / Join', commJoin);
+  if (commDets)  comm += '<p class="doc-text">'+esc(commDets)+'</p>';
+  document.getElementById('d-comm').innerHTML = comm || '<p class="doc-text">Your leader will walk you through how we stay in touch.</p>';
+
+  // SCHEDULE
+  let sched = '';
+  if (svcDays)  sched += blockArea('When We Serve', svcDays);
+  if (arrival)  sched += tip('🕐', 'Arrival time: '+arrival);
+  if (gSpot)    sched += block('Where to Go on Arrival', gSpot);
+  if (checkIn)  sched += block('Check-In Process', checkIn);
+  if (rehearse) sched += blockArea('Rehearsals / Team Meetings', rehearse);
+  if (dress)    sched += block('What to Wear', dress);
+  if (huddle)   sched += block('Pre-Service Prayer / Huddle', huddle);
+  if (parking)  sched += tip('🅿️', 'Parking: '+parking);
+  if (bring)    sched += block('What to Bring', bring);
+  if (typDay) {
+    sched += '<div style="margin-top:.6rem"><p style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#9a9490;margin-bottom:.35rem">A Typical Service Day</p>'+bulletLines(typDay)+'</div>';
+  }
+  document.getElementById('d-schedule').innerHTML = sched || '<p class="doc-text">Your leader will walk you through the schedule.</p>';
+
+  // PCO
+  let pco = '';
+  pco += stepBox('Getting Set Up on Planning Center', [
+    'Check your email for an invite from Planning Center — click the link to accept it and create your account.',
+    'Download the <strong>Church Center app</strong> (iOS or Android) and sign in with the same account.',
+    'Once you\'re set up, your team leader will add you to the schedule.'
+  ]);
+  if (schedAdv) pco += tip('📆', 'Schedules are typically posted '+schedAdv.toLowerCase()+'.');
+  pco += '<div style="height:.6rem"></div>';
+  pco += stepBox('Accepting or Declining a Schedule Request', [
+    'When you\'re scheduled, you\'ll get a <strong>push notification + email</strong> from Planning Center.',
+    'Open the <strong>Church Center app</strong> or click the link in the email.',
+    '<strong>Accept or Decline within 48 hours</strong> — this helps us fill gaps fast.',
+    'After accepting, tap into the plan to see notes, set lists, or service details.'
+  ]);
+  if (schedRes) pco += '<div style="margin-top:.65rem">'+blockArea('Resources in Your Schedule', schedRes)+'</div>';
+  pco += '<div style="height:.6rem"></div>';
+  pco += stepBox('How to Block Out Dates You\'re Unavailable', [
+    'Open the <strong>Church Center app</strong> and tap your profile picture (top right).',
+    'Tap <strong>Serving</strong> → then <strong>Block Out Dates.</strong>',
+    'Select the dates you\'re unavailable and tap <strong>Save.</strong>',
+    'We\'ll see your blocked dates when we build the schedule — no manual follow-up needed!'
+  ]);
+  if (schedN) pco += '<div style="margin-top:.65rem">'+blockArea('Additional Notes', schedN)+'</div>';
+  document.getElementById('d-pco').innerHTML = pco;
+
+  // ABSENCES + TRAINING
+  let ab = '';
+  if (absence)  ab += blockArea("If You Can't Make It", absence);
+  if (bgCheck)  ab += tipLabeled('📋', 'Background check', bgCheck);
+  if (training) ab += blockArea('Training Process', training);
+  if (timeline) ab += block('Timeline to Serve Independently', timeline);
+  document.getElementById('d-absence').innerHTML = ab || '<p class="doc-text">Communicate with your team leader as early as possible if you can\'t make it.</p>';
+
+  // EXTRA NOTES
+  if (extra) {
+    document.getElementById('d-extra').innerHTML = '<p class="doc-text">'+esc(extra)+'</p>';
+    document.getElementById('d-extra-sec').style.display = '';
+  } else {
+    document.getElementById('d-extra-sec').style.display = 'none';
+  }
+
+  // ATTACHMENTS
+  const attachSec = document.getElementById('d-attach-sec');
+  const attachDiv = document.getElementById('d-attachments');
+  if (uploadedFiles.length) {
+    let html = '';
+    // Images first — embed inline
+    uploadedFiles.filter(f => f.dataUrl).forEach(f => {
+      html += `<p style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#9a9490;margin-bottom:.3rem">${esc(f.name)}</p>`;
+      html += `<img src="${f.dataUrl}" class="doc-attach-img" alt="${esc(f.name)}" />`;
+    });
+    // Non-image files — list by name
+    const docs = uploadedFiles.filter(f => !f.dataUrl);
+    if (docs.length) {
+      html += '<ul class="doc-attach-list">'+docs.map(f =>
+        `<li>📄 ${esc(f.name)}</li>`
+      ).join('')+'</ul>';
+    }
+    attachDiv.innerHTML = html;
+    attachSec.style.display = '';
+  } else {
+    attachSec.style.display = 'none';
+  }
+
+  // FOOTER
+  document.getElementById('d-footer-team').textContent = team+' — Volunteer Onboarding Guide';
+
+  document.getElementById('preview-overlay').classList.add('open');
+  document.getElementById('preview-overlay').scrollTop = 0;
+
+  // Save a copy centrally so staff can see every team's current guide.
+  ogSaveToServer();
+}
+
+function closePreview() {
+  document.getElementById('preview-overlay').classList.remove('open');
+}
+document.getElementById('preview-overlay').addEventListener('click', function(e) {
+  if (e.target === this) closePreview();
+});
+
+// ═══════════════════════════════════════════════
+//  PRINT — renders the guide into a clean, white,
+//  print-only frame so page backgrounds never bleed in
+// ═══════════════════════════════════════════════
+function printGuide() {
+  const title = currentTeamName() + ' — Onboarding Guide';
+  const iframe = document.createElement('iframe');
+  iframe.setAttribute('aria-hidden', 'true');
+  iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+  document.body.appendChild(iframe);
+  const idoc = iframe.contentDocument;
+  idoc.open();
+  idoc.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + esc(title) + '</title>'
+    + '<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@1,500;1,600&display=swap" rel="stylesheet">'
+    + '<style>'
+    + '*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}'
+    + 'html,body{background:#fff}'
+    + "body{font-family:'Montserrat',system-ui,sans-serif;line-height:1.6;color:#1a1814;-webkit-print-color-adjust:exact;print-color-adjust:exact}"
+    + document.getElementById('doc-styles').innerHTML
+    + '#pdf-doc{max-width:100% !important;border-radius:0 !important;overflow:visible !important}'
+    + '.doc-cover{border-radius:0}'
+    // Page-break aesthetics: keep each section as one block (long form-driven
+    // sections may still break, but never right after their heading), keep
+    // cards/steps/list rows whole, and never strand a lone line of a paragraph.
+    + '.doc-sec{break-inside:avoid;page-break-inside:avoid}'
+    + '.doc-sec:has(#d-schedule),.doc-sec:has(#d-pco),.doc-sec:has(#d-attachments){break-inside:auto;page-break-inside:auto}'
+    + '.doc-sec-title{break-after:avoid;page-break-after:avoid}'
+    + '.doc-divider{break-after:avoid}'
+    + '.doc-card,.h-card,.h-grid,.doc-cards,.doc-step-box,.doc-tip,.doc-welcome,.doc-attach-img,.doc-attach-list li,.doc-list li,.doc-steps li{break-inside:avoid;page-break-inside:avoid}'
+    + '.doc-cover,.doc-footer{break-inside:avoid;page-break-inside:avoid}'
+    + 'p,li{orphans:3;widows:3}'
+    + '@page{size:letter;margin:0.5in 0 0.55in}'
+    + '@page :first{margin-top:0}'
+    + '</style></head><body>'
+    + document.getElementById('pdf-doc').outerHTML
+    + '</body></html>');
+  idoc.close();
+  const fire = () => {
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
+    setTimeout(() => iframe.remove(), 60000);
+  };
+  const imagesReady = () =>
+    Promise.all([...idoc.images].map(img =>
+      img.complete ? Promise.resolve() : new Promise(r => { img.onload = img.onerror = r; })));
+  const waitReady = () => {
+    if (idoc.readyState === 'complete') {
+      (idoc.fonts && idoc.fonts.ready ? idoc.fonts.ready : Promise.resolve())
+        .then(imagesReady)
+        .then(() => setTimeout(fire, 200));
+    } else {
+      setTimeout(waitReady, 100);
+    }
+  };
+  waitReady();
+}
+
+// ═══════════════════════════════════════════════
+//  CENTRAL STORE — every generated guide is saved
+//  to the church's Apps Script backend (one current
+//  guide per team) so staff can view them all.
+// ═══════════════════════════════════════════════
+const OG_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzW1ie-pEVvIZ8OlwnRo-SizsFKITd8xmtfqKeJPdPJ-1uzsz5KpGWDc1aBs6PURqFfww/exec';
+// Admin access = the phone sign-in (same device as the dashboard): the server checks the sign-in pass,
+// so no password or password fingerprint lives in this page any more.
+let _ogPw = '';
+function ogToken() { try { return localStorage.getItem('lssr_journey_token') || ''; } catch (e) { return ''; } }
+function ogIsAdmin() { try { return !!ogToken() && localStorage.getItem('lssr_admin') === '1'; } catch (e) { return false; } }
+let _admGuides = [];
+
+async function sha256Hex(s) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Google can drop a POST body on the /exec redirect (browsers signed into Google), and the
+// server then answers with its generic {ok:true}. The server echoes `for: <action>` on every
+// reply, so anything else is retried. Small payloads go by GET, which survives the redirect;
+// the request id (rid) keeps a retry from saving twice.
+async function ogPost(body) {
+  const b = Object.assign({ rid: Date.now().toString(36) + Math.random().toString(36).slice(2, 10) }, body);
+  const q = JSON.stringify(b);
+  const getUrl = OG_WEBAPP_URL + '?action=' + encodeURIComponent(b.action) + '&p=' + encodeURIComponent(q);
+  let viaGet = getUrl.length <= 8000;   // Apps Script GETs 400 somewhere past ~10 KB
+  for (let i = 0; i < 3; i++) {
+    try {
+      const r = viaGet ? await fetch(getUrl + '&_=' + Date.now()) : await fetch(OG_WEBAPP_URL, { method: 'POST', body: q });
+      if (viaGet && (r.status === 414 || r.status === 400)) viaGet = false;
+      const j = await r.json();
+      if (j && j.for === b.action) return j;
+    } catch (e) {}
+    await new Promise(res => setTimeout(res, 700 * (i + 1)));
+  }
+  throw new Error('No reply from the server');
+}
+
+// Fire-and-forget save. Image data is stripped so the payload stays small;
+// the author's own copy (browser save / export file) keeps the images.
+function ogSaveToServer() {
+  try {
+    const team = currentTeamName();
+    if (!team || team === 'Team') return;
+    const data = collectFormData();
+    data.files = (data.files || []).map(f => ({ name: f.name, type: f.type, dataUrl: null }));
+    ogPost({ action: 'og_save', team: team, leader: val('leader-name'), data: data, token: ogToken() })
+      .then(function(r) { if (!r || r.ok === false) ogSaveFailed(r && r.error); })
+      .catch(function() { ogSaveFailed(); });
+  } catch (e) { /* never block the preview on a save failure */ }
+}
+
+// A guide that didn't reach the team library says so (it used to fail silently).
+function ogSaveFailed(why) {
+  let b = document.getElementById('ogSaveWarn');
+  if (!b) { b = document.createElement('div'); b.id = 'ogSaveWarn'; b.setAttribute('role', 'status');
+    b.style.cssText = 'position:fixed;left:12px;right:12px;bottom:12px;max-width:460px;margin:0 auto;z-index:9999;background:#fff4e5;color:#5a3a00;border:1px solid #f0c98a;border-radius:10px;padding:10px 14px;font:600 13px/1.4 system-ui,sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.15)';
+    document.body.appendChild(b); }
+  b.textContent = 'This guide didn’t save to the team library' + (why ? ' (' + why + ')' : '') + '. Your copy on this device is safe — we’ll try again on your next change.';
+  clearTimeout(b._t); b._t = setTimeout(() => b.remove(), 7000);
+}
+
+function openAdmin()  { document.getElementById('adminOverlay').classList.add('open'); }
+function closeAdmin() { document.getElementById('adminOverlay').classList.remove('open'); }
+
+async function admUnlock() {
+  if (!ogIsAdmin()) { document.getElementById('admErr').style.display = ''; return; }
+  _ogPw = ogToken();
+  if (typeof currentTeamSelect === 'function' && currentTeamSelect()) ogLoadContacts(currentTeamSelect());
+  document.getElementById('admErr').style.display = 'none';
+  document.getElementById('admLocked').style.display = 'none';
+  document.getElementById('admContent').style.display = '';
+  admLoadList();
+}
+
+async function admLoadList() {
+  const el = document.getElementById('admList');
+  el.innerHTML = '<p class="adm-note">Loading saved guides…</p>';
+  try {
+    const res = await fetch(OG_WEBAPP_URL + '?action=og_list&pw=' + encodeURIComponent(_ogPw) + '&t=' + Date.now());
+    const j = await res.json();
+    if (!j.ok) throw new Error(j.error || 'failed');
+    _admGuides = j.guides || [];
+    if (!_admGuides.length) {
+      el.innerHTML = '<p class="adm-note">No guides saved yet. A guide appears here as soon as a team leader clicks <strong>Generate Onboarding Guide</strong>.</p>';
+      return;
+    }
+    el.innerHTML = _admGuides.map(function(g, i) {
+      const when = g.saved ? new Date(g.saved).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }) : '—';
+      return '<div class="adm-row"><div><div class="adm-team">' + esc(g.team) + '</div>' +
+             '<div class="adm-meta">' + esc(g.leader || 'No leader listed') + ' · saved ' + when + '</div></div>' +
+             '<div style="display:flex;gap:.4rem;flex-shrink:0">' +
+               '<button class="btn-secondary" onclick="admLoad(' + i + ')">Open</button>' +
+               '<button class="btn-secondary adm-del" onclick="admDelete(' + i + ')" title="Remove this guide">✕</button>' +
+             '</div></div>';
+    }).join('');
+  } catch (e) {
+    el.innerHTML = '<p class="adm-note">Could not load saved guides. Check your connection and try again.</p>';
+  }
+}
+
+async function admDelete(i) {
+  const g = _admGuides[i];
+  if (!g) return;
+  if (!confirm('Remove the saved guide for "' + g.team + '"? The team leader\'s own copy is not affected.')) return;
+  try {
+    const res = await fetch(OG_WEBAPP_URL + '?action=og_delete&pw=' + encodeURIComponent(_ogPw) +
+                            '&team=' + encodeURIComponent(g.team) + '&t=' + Date.now());
+    const j = await res.json();
+    if (!j.ok) throw new Error(j.error || 'failed');
+    admLoadList();
+  } catch (e) {
+    alert('Could not remove that guide.');
+  }
+}
+
+async function admLoad(i) {
+  const g = _admGuides[i];
+  if (!g) return;
+  try {
+    const res = await fetch(OG_WEBAPP_URL + '?action=og_get&pw=' + encodeURIComponent(_ogPw) +
+                            '&team=' + encodeURIComponent(g.team) + '&t=' + Date.now());
+    const j = await res.json();
+    if (!j.ok) throw new Error(j.error || 'failed');
+    applyFormData(j.data);
+    scheduleDraftSave();
+    document.getElementById('draft-note').style.display = 'none';
+    closeAdmin();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    alert('Loaded "' + j.team + '". Review or edit it below, then hit Generate to view or print it.');
+  } catch (e) {
+    alert('Could not open that guide.');
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  SAVE / LOAD / EXPORT / IMPORT + DRAFT AUTOSAVE
+// ═══════════════════════════════════════════════
+const STORE_KEY = 'lssr-onboarding-guides';
+const DRAFT_KEY = 'lssr-onboarding-draft';
+const TEXT_FIELDS = ['team-name','team-name-other','team-purpose','team-great','leader-name','leader-phone','leader-email','secondary-contact','secondary-phone','secondary-email','comm-join','comm-details','service-days','arrival-time','gather-spot','check-in','rehearsals','typical-day','dress-code','parking','huddle','bring-items','sched-advance','sched-resources','sched-notes','absence-policy','training','background-check','onboard-timeline','welcome-message','anything-else'];
+
+function collectFormData() {
+  const data = {
+    fields: {},
+    hasSecondary: document.getElementById('has-secondary').checked,
+    commMethods: checked('comm-methods'),
+    files: uploadedFiles.map(f => ({ name: f.name, type: f.type, dataUrl: f.dataUrl }))
+  };
+  TEXT_FIELDS.forEach(id => data.fields[id] = val(id));
+  return data;
+}
+
+function applyFormData(d) {
+  if (!d) return;
+  TEXT_FIELDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = (d.fields && d.fields[id]) || '';
+  });
+  handleTeamSelect(val('team-name'));
+  if (d.fields && d.fields['team-name-other']) document.getElementById('team-name-other').value = d.fields['team-name-other'];
+  document.getElementById('has-secondary').checked = !!d.hasSecondary;
+  document.getElementById('secondary-fields').style.display = d.hasSecondary ? '' : 'none';
+  document.querySelectorAll('#comm-methods input').forEach(c => c.checked = (d.commMethods || []).includes(c.value));
+  uploadedFiles.length = 0;
+  (d.files || []).forEach(f => uploadedFiles.push(f));
+  renderFileList();
+}
+
+function hasContent(d) {
+  return !!(d && ((d.fields && Object.values(d.fields).some(v => v && v.trim())) || (d.files && d.files.length)));
+}
+
+function currentTeamName() {
+  const t = val('team-name');
+  return t === 'Other' ? (val('team-name-other') || 'Team') : (t || 'Team');
+}
+
+function getStore() { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch (e) { return {}; } }
+
+function saveGuide() {
+  const name = prompt('Save this guide as:', currentTeamName() + ' Onboarding Guide');
+  if (!name) return;
+  const store = getStore();
+  store[name] = { savedAt: new Date().toISOString(), data: collectFormData() };
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify(store));
+  } catch (e) {
+    // Storage quota — retry without embedded images
+    store[name].data.files = store[name].data.files.map(f => ({ name: f.name, type: f.type, dataUrl: null }));
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify(store));
+      renderSavedList();
+      alert('Saved — but your uploaded images were too large to keep in browser storage. Re-attach them after loading, or use Export Guide File (it keeps images).');
+      return;
+    } catch (e2) {
+      alert('Could not save — browser storage is full. Use Export Guide File instead.');
+      return;
+    }
+  }
+  renderSavedList();
+  document.getElementById('saved-select').value = name;
+  alert('Saved! "' + name + '" will be waiting in the Saved Guides list next time you open this page in this browser.');
+}
+
+function renderSavedList() {
+  const store = getStore();
+  const names = Object.keys(store).sort((a, b) => (store[b].savedAt || '').localeCompare(store[a].savedAt || ''));
+  const sel = document.getElementById('saved-select');
+  sel.innerHTML = '<option value="">'
+    + (names.length ? '— Select a saved guide —' : '— No saved guides in this browser yet —')
+    + '</option>'
+    + names.map(n => '<option value="' + esc(n) + '">' + esc(n) + '  ·  saved ' + new Date(store[n].savedAt).toLocaleDateString() + '</option>').join('');
+}
+
+function loadSelectedGuide() {
+  const name = document.getElementById('saved-select').value;
+  if (!name) { alert('Choose a saved guide from the dropdown first.'); return; }
+  const entry = getStore()[name];
+  if (!entry) { alert('That guide could not be found.'); renderSavedList(); return; }
+  applyFormData(entry.data);
+  scheduleDraftSave();
+  document.getElementById('draft-note').style.display = 'none';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function deleteSelectedGuide() {
+  const name = document.getElementById('saved-select').value;
+  if (!name) { alert('Choose a saved guide from the dropdown first.'); return; }
+  if (!confirm('Delete "' + name + '" from this browser? This can\'t be undone.')) return;
+  const store = getStore();
+  delete store[name];
+  localStorage.setItem(STORE_KEY, JSON.stringify(store));
+  renderSavedList();
+}
+
+function downloadBlob(blob, filename) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+function safeFilename(s) { return s.replace(/[\\\/:*?"<>|]+/g, '').trim() || 'Onboarding Guide'; }
+
+function exportGuideFile() {
+  const payload = { app: 'lssr-onboarding-guide', version: 1, exportedAt: new Date().toISOString(), data: collectFormData() };
+  downloadBlob(
+    new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }),
+    safeFilename(currentTeamName()) + ' - Onboarding Guide (editable).json'
+  );
+}
+
+function importGuideFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const parsed = JSON.parse(e.target.result);
+      const d = parsed && parsed.app === 'lssr-onboarding-guide' ? parsed.data : parsed;
+      if (!hasContent(d)) throw new Error('empty');
+      applyFormData(d);
+      scheduleDraftSave();
+      document.getElementById('draft-note').style.display = 'none';
+      alert('Guide imported! Review the form, make your edits, then hit Generate.');
+    } catch (err) {
+      alert("That file doesn't look like an exported guide file.");
+    }
+  };
+  reader.readAsText(file);
+}
+
+// Draft autosave — everything typed is kept in this browser automatically
+let draftTimer = null;
+function scheduleDraftSave() {
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(() => {
+    const d = collectFormData();
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(d));
+    } catch (e) {
+      d.files = d.files.map(f => ({ name: f.name, type: f.type, dataUrl: null }));
+      try { localStorage.setItem(DRAFT_KEY, JSON.stringify(d)); } catch (e2) {}
+    }
+  }, 600);
+}
+document.addEventListener('input', scheduleDraftSave);
+document.addEventListener('change', scheduleDraftSave);
+
+function clearDraft() {
+  localStorage.removeItem(DRAFT_KEY);
+  location.reload();
+}
+
+function initGenerator() {
+  initDropZone();
+  renderSavedList();
+  ogLoadTeamData();
+  try {
+    const draft = JSON.parse(localStorage.getItem(DRAFT_KEY));
+    if (hasContent(draft)) {
+      applyFormData(draft);
+      document.getElementById('draft-note').style.display = '';
+    }
+  } catch (e) {}
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initGenerator);
+} else {
+  initGenerator();
+}
+
+// ═══════════════════════════════════════════════
+//  WORD EXPORT — real .docx (OOXML), editable in
+//  Microsoft Word, Apple Pages, and Google Docs.
+//  Styled to mirror the PDF. Library loads on demand.
+// ═══════════════════════════════════════════════
+let _docxLibPromise = null;
+function loadDocxLib() {
+  if (window.docx) return Promise.resolve(window.docx);
+  if (!_docxLibPromise) {
+    _docxLibPromise = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.integrity = 'sha384-4xaIisuLEy2lo2HkB2C4rEf7v8jbTb2kuogX6TkuEt9feTWKBSFSOzsqNNbV+sKh'; s.crossOrigin = 'anonymous';
+      s.src = 'https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js';
+      s.onload = () => window.docx ? resolve(window.docx) : reject(new Error('docx global missing'));
+      s.onerror = () => { _docxLibPromise = null; reject(new Error('docx lib failed to load')); };
+      document.head.appendChild(s);
+    });
+  }
+  return _docxLibPromise;
+}
+
+function dataUrlBytes(dataUrl) {
+  const bin = atob(dataUrl.split(',')[1]);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return arr;
+}
+
+function imgDims(dataUrl) {
+  return new Promise(res => {
+    const im = new Image();
+    im.onload = () => res({ w: im.naturalWidth, h: im.naturalHeight });
+    im.onerror = () => res(null);
+    im.src = dataUrl;
+  });
+}
+
+async function fetchLogoBytes() {
+  try {
+    const r = await fetch(new URL('assets/ls-logo-white.png', location.href).href);
+    if (!r.ok) return null;
+    return new Uint8Array(await r.arrayBuffer());
+  } catch (e) { return null; }
+}
+
+async function downloadWord() {
+  let d;
+  try { d = await loadDocxLib(); }
+  catch (e) { alert('Could not load the Word builder — check your internet connection and try again.'); return; }
+
+  const { Document, Packer, Paragraph, TextRun, ImageRun, Table, TableRow, TableCell,
+          WidthType, BorderStyle, AlignmentType, VerticalAlign } = d;
+
+  const GOLD = 'C49A2E', GOLD2 = 'E0B84A', DARK = '1E1C1B', INK = '2E2A26',
+        MUT = '9A9490', CREAM = 'F7F4EF', BOX = 'F2F0EC', GREY = 'B8B2AB';
+  const NB = { style: BorderStyle.NIL };
+  const NO_BORDERS = { top: NB, bottom: NB, left: NB, right: NB, insideHorizontal: NB, insideVertical: NB };
+  const CELL_PAD = { top: 200, bottom: 200, left: 260, right: 260 };
+
+  const team    = currentTeamName();
+  const leader  = val('leader-name') || 'Your Team Leader';
+  const lines   = t => t.split('\n').filter(l => l.trim()).map(l => l.trim().replace(/^(?:[•\-\*]+|\d+[\.\)])\s+/, ''));
+
+  // ── building blocks ──
+  const run  = (text, o) => new TextRun(Object.assign({ text: text, font: 'Montserrat', size: 21, color: INK }, o || {}));
+  const body = (text, o) => new Paragraph(Object.assign({ children: [run(text)], spacing: { after: 140, line: 300 } }, o || {}));
+  const lbl  = (label, text) => !text ? null : new Paragraph({
+    spacing: { after: 140, line: 300 },
+    children: [run(label + ':  ', { bold: true }), run(text)]
+  });
+  const secHead = text => new Paragraph({
+    keepNext: true,
+    spacing: { before: 400, after: 200 },
+    border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: GOLD, space: 4 } },
+    children: [run(text.toUpperCase(), { bold: true, color: GOLD, size: 17, characterSpacing: 40 })]
+  });
+  const subHead = text => new Paragraph({
+    keepNext: true, spacing: { before: 160, after: 100 },
+    children: [run(text.toUpperCase(), { bold: true, color: MUT, size: 15, characterSpacing: 30 })]
+  });
+  const bullet = text => new Paragraph({
+    spacing: { after: 90, line: 290 }, indent: { left: 260, hanging: 260 },
+    children: [run('▸  ', { bold: true, color: GOLD }), run(text)]
+  });
+  const step = (n, text) => new Paragraph({
+    spacing: { after: 90, line: 290 }, indent: { left: 300, hanging: 300 },
+    children: [run(n + '.  ', { bold: true, color: GOLD }), run(text)]
+  });
+  const shadedBox = children => new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE }, borders: NO_BORDERS,
+    rows: [new TableRow({ children: [new TableCell({ shading: { fill: BOX }, margins: CELL_PAD, children: children })] })]
+  });
+  const gap = (pts) => new Paragraph({ spacing: { after: pts || 120 }, children: [] });
+
+  const kids = [];
+
+  // ── COVER — dark band: logo left, team name + Onboarding Guide right ──
+  const logoBytes = await fetchLogoBytes();
+  const coverRight = [
+    new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { after: 160 },
+      children: [run('LIVING STONES CHURCH · SOUTH RENO', { bold: true, color: GOLD, size: 14, characterSpacing: 50 })] }),
+    new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { after: 60 },
+      children: [run(team, { bold: true, color: 'FFFFFF', size: 54 })] }),
+    new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { after: 220 },
+      children: [run('Onboarding Guide', { italics: true, color: GOLD2, size: 30, font: 'Georgia' })] }),
+    new Paragraph({ alignment: AlignmentType.RIGHT,
+      children: [run('👋 Led by ' + leader, { bold: true, color: GOLD, size: 19 })] })
+  ];
+  const coverCells = [];
+  if (logoBytes) {
+    coverCells.push(new TableCell({
+      width: { size: 24, type: WidthType.PERCENTAGE }, shading: { fill: DARK },
+      verticalAlign: VerticalAlign.CENTER, margins: { top: 340, bottom: 340, left: 340, right: 100 },
+      children: [new Paragraph({ children: [new ImageRun({ data: logoBytes, transformation: { width: 96, height: 96 } })] })]
+    }));
+  }
+  coverCells.push(new TableCell({
+    width: { size: logoBytes ? 76 : 100, type: WidthType.PERCENTAGE }, shading: { fill: DARK },
+    verticalAlign: VerticalAlign.CENTER, margins: { top: 340, bottom: 340, left: 200, right: 340 },
+    children: coverRight
+  }));
+  kids.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: NO_BORDERS,
+    rows: [new TableRow({ children: coverCells })] }));
+  kids.push(gap(200));
+
+  // ── WELCOME ──
+  const welcomeTxt = val('welcome-message') ||
+    ('Welcome to the ' + team + "! We're so glad you're here. This guide covers everything you need to know to get started serving with us.");
+  kids.push(new Paragraph({
+    shading: { fill: CREAM },
+    border: { left: { style: BorderStyle.SINGLE, size: 24, color: GOLD, space: 8 } },
+    spacing: { before: 200, after: 200, line: 320 },
+    indent: { left: 200, right: 200 },
+    children: [run(welcomeTxt)]
+  }));
+
+  // ── ABOUT ──
+  kids.push(secHead('About This Team'));
+  kids.push(body(val('team-purpose') || 'This team serves Living Stones Church with excellence and joy.'));
+  if (val('team-great')) { kids.push(subHead("Why It's Great to Serve Here")); kids.push(body(val('team-great'))); }
+
+  // ── CONTACTS — 2-up cards like the PDF ──
+  kids.push(secHead('Your Key Contacts'));
+  const contacts = [];
+  if (val('leader-name'))  contacts.push(['Team Leader', val('leader-name')]);
+  if (val('leader-phone')) contacts.push(['Phone / Text', val('leader-phone')]);
+  if (val('leader-email')) contacts.push(['Email', val('leader-email')]);
+  if (document.getElementById('has-secondary').checked) {
+    if (val('secondary-contact')) contacts.push(['Secondary Contact', val('secondary-contact')]);
+    if (val('secondary-phone'))   contacts.push(['Secondary Phone', val('secondary-phone')]);
+    if (val('secondary-email'))   contacts.push(['Secondary Email', val('secondary-email')]);
+  }
+  if (!contacts.length) contacts.push(['Contact', 'See your team leader for details']);
+  const cardCell = c => new TableCell({
+    width: { size: 50, type: WidthType.PERCENTAGE },
+    shading: { fill: c ? CREAM : 'FFFFFF' },
+    borders: c ? { top: NB, bottom: NB, right: NB, left: { style: BorderStyle.SINGLE, size: 24, color: GOLD } } : { top: NB, bottom: NB, right: NB, left: NB },
+    margins: { top: 140, bottom: 140, left: 220, right: 160 },
+    children: c ? [
+      new Paragraph({ spacing: { after: 30 }, children: [run(c[0].toUpperCase(), { bold: true, color: MUT, size: 13, characterSpacing: 30 })] }),
+      new Paragraph({ children: [run(c[1], { bold: true, size: 20 })] })
+    ] : [new Paragraph({ children: [] })]
+  });
+  const cardRows = [];
+  for (let i = 0; i < contacts.length; i += 2) {
+    cardRows.push(new TableRow({ children: [cardCell(contacts[i]), cardCell(contacts[i + 1] || null)] }));
+  }
+  kids.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: NO_BORDERS, rows: cardRows }));
+
+  // ── COMMUNICATION ──
+  kids.push(secHead('How We Communicate'));
+  const commM = checked('comm-methods');
+  let anyComm = false;
+  if (commM.length) { kids.push(subHead('Platforms We Use')); commM.forEach(m => kids.push(bullet(m))); anyComm = true; }
+  if (val('comm-join'))    { kids.push(lbl('How to Access / Join', val('comm-join'))); anyComm = true; }
+  if (val('comm-details')) { kids.push(body(val('comm-details'))); anyComm = true; }
+  if (!anyComm) kids.push(body('Your leader will walk you through how we stay in touch.'));
+
+  // ── WHEN WE SERVE ──
+  kids.push(secHead('When We Serve'));
+  [['Service Days & Times', 'service-days'], ['Arrival Time', 'arrival-time'],
+   ['Where to Go on Arrival', 'gather-spot'], ['Check-In Process', 'check-in'],
+   ['Rehearsals / Team Meetings', 'rehearsals'], ['What to Wear', 'dress-code'],
+   ['Pre-Service Prayer / Huddle', 'huddle'], ['Parking', 'parking'],
+   ['What to Bring', 'bring-items']].forEach(pair => {
+    const p = lbl(pair[0], val(pair[1]));
+    if (p) kids.push(p);
+  });
+  if (val('typical-day')) {
+    kids.push(subHead('A Typical Service Day'));
+    lines(val('typical-day')).forEach(l => { const t = l.trim(); kids.push(/:$/.test(t) && !/ — /.test(t) && t.length < 70 ? subHead(t.replace(/:$/, '')) : bullet(l)); });
+  }
+
+  // ── PLANNING CENTER ──
+  kids.push(secHead('Planning Center — Your Schedule'));
+  kids.push(shadedBox([subHead('Getting Set Up')].concat([
+    'Check your email for an invite from Planning Center — click the link to accept it and create your account.',
+    'Download the Church Center app (iOS or Android) and sign in with the same account.',
+    "Once you're set up, your team leader will add you to the schedule."
+  ].map((s, i) => step(i + 1, s)))));
+  kids.push(gap());
+  if (val('sched-advance')) kids.push(lbl('Schedules Are Posted', val('sched-advance').toLowerCase()));
+  kids.push(shadedBox([subHead('Accepting or Declining a Schedule Request')].concat([
+    "When you're scheduled, you'll get a push notification + email from Planning Center.",
+    'Open the Church Center app or click the link in the email.',
+    'Accept or Decline within 48 hours — this helps us fill gaps fast.',
+    'After accepting, tap into the plan to see notes, set lists, or service details.'
+  ].map((s, i) => step(i + 1, s)))));
+  kids.push(gap());
+  if (val('sched-resources')) kids.push(lbl('Resources in Your Schedule', val('sched-resources')));
+  kids.push(shadedBox([subHead("How to Block Out Dates You're Unavailable")].concat([
+    'Open the Church Center app and tap your profile picture (top right).',
+    'Tap Serving → then Block Out Dates.',
+    "Select the dates you're unavailable and tap Save.",
+    "We'll see your blocked dates when we build the schedule — no manual follow-up needed!"
+  ].map((s, i) => step(i + 1, s)))));
+  if (val('sched-notes')) { kids.push(gap()); kids.push(lbl('Additional Notes', val('sched-notes'))); }
+
+  // ── ABSENCES + TRAINING ──
+  kids.push(secHead("Can't Make It? Getting Started?"));
+  let anyAb = false;
+  [["If You Can't Make It", 'absence-policy'], ['Background Check', 'background-check'],
+   ['Training Process', 'training'], ['Timeline to Serve Independently', 'onboard-timeline']].forEach(pair => {
+    const p = lbl(pair[0], val(pair[1]));
+    if (p) { kids.push(p); anyAb = true; }
+  });
+  if (!anyAb) kids.push(body("Communicate with your team leader as early as possible if you can't make it."));
+
+  // ── FOUR H'S — 2×2 dark cards ──
+  kids.push(secHead("Our Staff Values — The Four H's"));
+  const hs = [
+    ['Humble', 'We serve others before ourselves, never seeking the spotlight.'],
+    ['Hungry', 'Always growing, always learning, never settling for good enough.'],
+    ['Happy', 'We serve with joy and gratitude, bringing gladness to the work and to each other.'],
+    ['Honest', "We tell the truth with grace and do the right thing, even when no one's watching."]
+  ];
+  const hCell = h => new TableCell({
+    width: { size: 50, type: WidthType.PERCENTAGE }, shading: { fill: DARK },
+    borders: { top: { style: BorderStyle.SINGLE, size: 6, color: 'FFFFFF' }, bottom: { style: BorderStyle.SINGLE, size: 6, color: 'FFFFFF' }, left: { style: BorderStyle.SINGLE, size: 6, color: 'FFFFFF' }, right: { style: BorderStyle.SINGLE, size: 6, color: 'FFFFFF' } },
+    margins: { top: 200, bottom: 200, left: 260, right: 260 },
+    children: [
+      new Paragraph({ spacing: { after: 40 }, children: [run('H', { bold: true, color: GOLD, size: 34 })] }),
+      new Paragraph({ spacing: { after: 60 }, children: [run(h[0].toUpperCase(), { bold: true, color: 'FFFFFF', size: 17, characterSpacing: 40 })] }),
+      new Paragraph({ children: [run(h[1], { color: GREY, size: 17 })] })
+    ]
+  });
+  kids.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: NO_BORDERS,
+    rows: [new TableRow({ children: [hCell(hs[0]), hCell(hs[1])] }),
+           new TableRow({ children: [hCell(hs[2]), hCell(hs[3])] })] }));
+
+  // ── GOOD TO KNOW ──
+  if (val('anything-else')) { kids.push(secHead('Good to Know')); kids.push(body(val('anything-else'))); }
+
+  // ── ATTACHMENTS ──
+  if (uploadedFiles.length) {
+    kids.push(secHead('Supplementary Documents'));
+    for (const f of uploadedFiles) {
+      kids.push(new Paragraph({ keepNext: true, spacing: { before: 120, after: 60 },
+        children: [run((f.dataUrl ? '' : '📄 ') + f.name, { bold: true, color: MUT, size: 15, characterSpacing: 30 })] }));
+      if (f.dataUrl) {
+        try {
+          const dims = await imgDims(f.dataUrl);
+          if (dims) {
+            const scale = Math.min(1, 600 / dims.w);
+            kids.push(new Paragraph({ spacing: { after: 140 }, children: [new ImageRun({
+              data: dataUrlBytes(f.dataUrl),
+              transformation: { width: Math.round(dims.w * scale), height: Math.round(dims.h * scale) }
+            })] }));
+          }
+        } catch (e) { /* skip unembeddable image, name stays listed */ }
+      }
+    }
+  }
+
+  // ── FOOTER ──
+  kids.push(gap(200));
+  kids.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: NO_BORDERS,
+    rows: [new TableRow({ children: [
+      new TableCell({ width: { size: 55, type: WidthType.PERCENTAGE }, shading: { fill: BOX }, margins: { top: 140, bottom: 140, left: 220, right: 120 },
+        children: [new Paragraph({ children: [run(team + ' — Volunteer Onboarding Guide', { bold: true, color: MUT, size: 14 })] })] }),
+      new TableCell({ width: { size: 45, type: WidthType.PERCENTAGE }, shading: { fill: BOX }, margins: { top: 140, bottom: 140, left: 120, right: 220 },
+        children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [run('LIVING STONES CHURCH · SOUTH RENO', { bold: true, color: GOLD, size: 14, characterSpacing: 30 })] })] })
+    ] })] }));
+
+  const doc = new Document({
+    styles: { default: { document: { run: { font: 'Montserrat', size: 21, color: INK } } } },
+    sections: [{
+      properties: { page: { margin: { top: 850, bottom: 850, left: 1000, right: 1000 } } },
+      children: kids
+    }]
+  });
+
+  try {
+    const blob = await Packer.toBlob(doc);
+    downloadBlob(blob, safeFilename(team) + ' - Onboarding Guide.docx');
+  } catch (e) {
+    console.error('docx build failed:', e);
+    alert('Something went wrong building the Word file. Try again, or use Print / Save PDF.');
+  }
+}
+</script>
+</body>
+</html>

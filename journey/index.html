@@ -1,0 +1,2005 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- BETA SITE ONLY. scripts/stage.sh adds this to the beta copy; it is never in the live site. -->
+<meta name="robots" content="noindex,nofollow">
+<script>
+(function(){
+  // The beta site reads the LIVE data files from lssouthreno.com (the backend only updates
+  // those), so beta always shows today's real numbers. Everything else (the page code) is beta.
+  var LIVE = 'https://lssouthreno.com', DATA = ["absences.json", "appsscript.json", "dashboard-data.json", "eos-data.json", "ids_log.json", "joy_bombs.json", "pathway.json", "shepherding-data.json"];
+  var real = window.fetch;
+  window.fetch = function(input, init){
+    try {
+      var u = new URL(typeof input === 'string' ? input : input.url, location.href);
+      var file = u.pathname.replace(/^\//, '');
+      if (u.origin === location.origin && DATA.indexOf(file) !== -1) input = LIVE + u.pathname + u.search;
+    } catch(e) {}
+    return real.call(this, input, init);
+  };
+  window.LSSR_BETA = {"commit":"414b7661","built":"20261023T152917Z","live":"https://lssouthreno.com"};
+  function ribbon(){
+    if (document.getElementById('lssrBetaRibbon') || window.top !== window) return;   // one ribbon, not one per embedded frame
+    var d = document.createElement('div');
+    d.id = 'lssrBetaRibbon';
+    d.innerHTML = 'BETA &middot; test site &middot; edits still save to the real data';
+    d.title = 'Beta build ' + (window.LSSR_BETA.commit || '') + ' (' + (window.LSSR_BETA.built || '') + '). The live site is lssouthreno.com.';
+    d.style.cssText = 'position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:2147483000;background:#7c3aed;color:#fff;font:700 11px/1 Montserrat,system-ui,sans-serif;letter-spacing:.08em;padding:5px 12px;border-radius:0 0 8px 8px;pointer-events:none;box-shadow:0 2px 10px rgba(0,0,0,.4);white-space:nowrap';
+    document.body.appendChild(d);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ribbon); else ribbon();
+})();
+</script>
+
+<meta charset="UTF-8">
+<script src="/theme.js"></script>
+<meta name="referrer" content="no-referrer">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#f5f3ee">
+<title>Living Stones</title>
+<!-- The member app: installing from this page gives "Living Stones" (opens on /journey/; scope "/" so
+     the Dashboard link stays inside the app for staff). The staff app is /manifest.webmanifest. See APP-PLAN.md. -->
+<link rel="manifest" href="/journey/manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Living Stones">
+<link rel="icon" type="image/png" href="/assets/app/icon-192.png">
+<link rel="apple-touch-icon" href="/assets/app/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://script.google.com"><link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
+<!--
+  My Journey — every person's private page (linked from the dashboard nav). Backend: Code_journey.gs
+  (jr_* actions on the Staff OS web app). Sign-in: phone number → texted code (Twilio Verify) or an
+  emailed one-tap link + code. Pastors can preview anyone from the Care drawer.
+  Leaders (community-group leaders, serve-team leaders) also see their group's / team's roster.
+-->
+<style>
+  :root { --bg:#141414; --card:#1f1f1f; --card-2:#262626; --line:#2e2e2e; --line-2:#3a3a3a; --text:#f2efe9; --muted:#a39e94; --dim:#78726a;
+    --gold:#d4af37; --gold-hi:#e3c35a; --gold-bg:rgba(212,175,55,.12); --gold-line:rgba(212,175,55,.38); --ok:#8fd1a8; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; background:var(--bg); color:var(--text); font-family:'Montserrat',sans-serif; -webkit-font-smoothing:antialiased; }
+  a { color:var(--gold); }
+  .top { height:60px; display:flex; align-items:center; gap:12px; padding:0 24px; border-bottom:1px solid var(--line); background:rgba(20,20,20,.96); position:sticky; top:0; z-index:5; }
+  .top img { height:28px; }
+  .top .t { border-left:1px solid var(--line-2); padding-left:12px; font-weight:700; color:var(--muted); font-size:14px; }
+  .top .r { margin-left:auto; display:flex; gap:8px; align-items:center; }
+  /* Embedded inside the dashboard's My Journey tab (?embed=1): no top bar, tighter page padding. */
+  body.embed .top { display:none; }
+  body.embed .wrap { padding:10px 0 30px; max-width:none; }
+  body.embed .signin { padding-top:10px; }
+  body.embed .quiet { margin-bottom:0; }
+  .roster { width:100%; border-collapse:collapse; font-size:13.5px; }
+  .roster th { text-align:left; font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim); font-weight:700; padding:0 6px 8px; }
+  .roster td { padding:9px 6px; border-top:1px solid var(--line); vertical-align:top; line-height:1.35; }
+  .roster td.n { font-weight:600; white-space:nowrap; }
+  .roster td.n small { display:block; color:var(--dim); font-weight:500; font-size:11.5px; }
+  .roster .y { color:var(--ok); font-weight:700; } .roster .nn { color:var(--dim); } .roster .q { color:var(--dim); }
+  .roster td.s { color:var(--muted); font-size:12.5px; }
+  .lead-sum { display:flex; gap:14px; flex-wrap:wrap; margin:0 0 12px; color:var(--muted); font-size:13px; }
+  .lead-sum b { color:var(--text); }
+  @media (max-width:640px) {
+    .roster thead { display:none; }
+    .roster tr { display:block; padding:10px 0; border-top:1px solid var(--line); }
+    .roster td { display:block; border:0; padding:2px 0; }
+    .roster td.f::before, .roster td.o::before { content:attr(data-l) ': '; color:var(--dim); font-size:12px; }
+    .roster td.f, .roster td.o { display:inline-block; margin-right:14px; }
+    .roster td.s { padding-top:4px; }
+  }
+  .wrap { max-width:1180px; margin:0 auto; padding:30px 24px 60px; }
+  .btn { appearance:none; display:inline-flex; align-items:center; justify-content:center; gap:6px; font:700 14px 'Montserrat',sans-serif; padding:10px 16px; border-radius:9px; border:1px solid var(--line-2); background:var(--card-2); color:var(--text); cursor:pointer; text-decoration:none; white-space:nowrap; }
+  .btn:hover { border-color:#4a4a4a; }
+  .btn.p { background:var(--gold); border-color:var(--gold); color:#1a1407; }
+  .btn.p:hover { background:var(--gold-hi); }
+  .btn.g { background:none; color:var(--muted); }
+  .btn.sm { padding:7px 12px; font-size:13px; }
+  .btn:disabled { opacity:.55; cursor:default; }
+  .banner .why { margin-top:5px; color:var(--muted); font-weight:500; font-size:13px; } .banner .why b { color:var(--gold); }
+  .banner { position:relative; z-index:2; background:var(--gold-bg); border-bottom:1px solid var(--gold-line); color:var(--gold); font-size:13.5px; font-weight:600; padding:10px 24px; text-align:center; margin-bottom:10px; border-radius:10px; }
+  /* sign-in */
+  .signin { max-width:420px; margin:0 auto; padding:56px 22px 60px; text-align:center; }
+  .signin img.mark { width:58px; height:58px; }
+  .signin h1 { font-family:'Montserrat',sans-serif; font-weight:700; letter-spacing:-.01em; font-size:30px; margin:18px 0 10px; }
+  .signin p { color:var(--muted); font-size:15px; line-height:1.6; margin:0 0 22px; }
+  .field { width:100%; background:var(--card-2); border:1px solid var(--line-2); border-radius:11px; padding:15px 16px; font:500 18px 'Montserrat',sans-serif; color:var(--text); text-align:center; letter-spacing:.02em; }
+  .field:focus { outline:none; border-color:var(--gold-line); }
+  .field.code { font-size:28px; letter-spacing:.35em; font-weight:800; }
+  .signin .btn { width:100%; padding:14px; font-size:15px; margin-top:12px; }
+  .or { display:flex; align-items:center; gap:12px; color:var(--dim); font-size:12.5px; margin:20px 0 8px; }
+  .or::before, .or::after { content:''; flex:1; height:1px; background:var(--line); }
+  .fine { color:var(--dim); font-size:13px; line-height:1.6; margin-top:18px; }
+  .err { color:#f0a3a4; font-size:14px; margin-top:12px; min-height:20px; }
+  .pick { display:flex; flex-direction:column; gap:10px; margin-top:8px; }
+  /* journey */
+  .hero { display:flex; gap:18px; align-items:center; margin-bottom:24px; flex-wrap:wrap; }
+  .hero .av { width:64px; height:64px; border-radius:50%; object-fit:cover; background:var(--card-2); flex-shrink:0; border:2px solid var(--gold-line); }
+  .hero h1 { margin:0; font-family:'Playfair Display',serif; font-size:32px; line-height:1.15; }
+  .hero .s { color:var(--muted); font-size:15px; margin-top:6px; line-height:1.55; max-width:680px; }
+  .path { display:flex; margin:6px 0 28px; }
+  .stop { flex:1; display:flex; flex-direction:column; align-items:center; gap:8px; position:relative; text-align:center; padding:0 4px; }
+  .stop .dot { width:18px; height:18px; border-radius:50%; border:2px solid #4a4843; background:var(--bg); z-index:1; }
+  .stop.done .dot { background:var(--gold); border-color:var(--gold); }
+  .stop.now .dot { border-color:var(--gold); box-shadow:0 0 0 5px rgba(212,175,55,.18); }
+  .stop b { font-size:14px; } .stop.now b { color:var(--gold); }
+  .stop span { font-size:12.5px; color:#d9d4ca; line-height:1.4; max-width:170px; }
+  .stop:not(:last-child)::after { content:''; position:absolute; top:8px; left:50%; width:100%; height:2px; background:#3a3a3a; }
+  .stop.done:not(:last-child)::after { background:var(--gold); }
+  .grid { display:grid; gap:16px; }
+  .g2 { grid-template-columns:1.35fr 1fr; } .g3 { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px 22px; min-width:0; }
+  .card-h { display:flex; align-items:baseline; gap:10px; margin-bottom:12px; }
+  .card-h h3 { margin:0; font-size:12.5px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--gold); }
+  .card-h .c { margin-left:auto; font-size:12.5px; color:var(--dim); }
+  .step { display:flex; gap:14px; padding:16px 0; border-top:1px solid var(--line); }
+  .step:first-of-type { border-top:0; padding-top:4px; }
+  .step .ic { width:42px; height:42px; border-radius:12px; background:var(--gold-bg); border:1px solid var(--gold-line); flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+  .step .ic svg { width:21px; height:21px; stroke:var(--gold); fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  .step b { display:block; font-size:16.5px; margin-bottom:4px; }
+  .step p { margin:0 0 12px; color:var(--muted); font-size:14.5px; line-height:1.6; }
+  .step .acts { display:flex; gap:8px; flex-wrap:wrap; }
+  .step.celebrate .ic { background:rgba(95,174,126,.12); border-color:rgba(95,174,126,.4); } .step.celebrate .ic svg { stroke:var(--ok); }
+  .fact { display:flex; gap:12px; align-items:flex-start; padding:12px 0; border-top:1px solid var(--line); font-size:15px; }
+  .fact:first-of-type { border-top:0; padding-top:2px; }
+  .fact .k { width:94px; flex-shrink:0; font-size:11.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--dim); padding-top:3px; }
+  .fact .v { flex:1; line-height:1.5; min-width:0; }
+  .fact .v small { display:block; color:var(--dim); font-size:13px; margin-top:2px; }
+  .ok { color:var(--ok); }
+  .ms { position:relative; padding-left:22px; }
+  .ms::before { content:''; position:absolute; left:6px; top:8px; bottom:8px; width:2px; background:#3a3a3a; }
+  .ms div { position:relative; padding:7px 0; font-size:14.5px; line-height:1.4; }
+  .ms div::before { content:''; position:absolute; left:-20px; top:12px; width:10px; height:10px; border-radius:50%; background:var(--gold); }
+  .ms div.next { color:var(--dim); } .ms div.next::before { background:var(--bg); border:2px solid #4a4843; width:6px; height:6px; }
+  .ms span { color:var(--dim); font-size:12.5px; margin-left:6px; white-space:nowrap; }
+  .pastor { display:flex; gap:14px; align-items:center; }
+  .pastor .av { width:52px; height:52px; border-radius:50%; background:linear-gradient(135deg,#6b5a3a,#3a3226); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:17px; flex-shrink:0; }
+  .muted { color:var(--muted); } .dim { color:var(--dim); font-size:13px; }
+  .quiet { font-size:13px; color:var(--dim); line-height:1.6; margin-top:22px; border-top:1px solid var(--line); padding-top:16px; }
+  .loading { text-align:center; color:var(--muted); padding:90px 20px; font-size:15px; }
+  /* note sheet */
+  .sheet-ov { position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:flex-end; justify-content:center; z-index:20; overscroll-behavior:contain; }
+  .sheet-ov.open { display:flex; }
+  .sheet { background:var(--card); border:1px solid var(--line-2); border-radius:18px 18px 0 0; width:min(560px,100%); padding:22px 22px calc(22px + env(safe-area-inset-bottom)); }
+  .sheet h3 { margin:0 0 6px; font-size:18px; }
+  .sheet textarea { width:100%; min-height:130px; background:var(--card-2); border:1px solid var(--line-2); border-radius:10px; padding:12px 14px; font:15px/1.5 'Montserrat',sans-serif; color:var(--text); resize:vertical; margin-top:10px; }
+  .sheet textarea:focus { outline:none; border-color:var(--gold-line); }
+  /* pane: Groups / Give / Events / Me / Share open as a popup over the Me page */
+  .pane-ov { position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; z-index:15; overscroll-behavior:contain; padding:20px; }
+  .pane-ov.open { display:flex; }
+  .pane { position:relative; background:var(--card); border:1px solid var(--line-2); border-radius:18px; width:min(600px,100%); max-height:min(88vh,900px); overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; box-shadow:0 18px 60px rgba(0,0,0,.45); }
+  .pane-x { position:sticky; top:10px; float:right; margin:10px 10px 0 0; z-index:2; width:40px; height:40px; border-radius:50%; border:1px solid var(--line-2); background:var(--card-2); color:var(--text); font-size:16px; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .pane-x:hover { border-color:var(--gold-line); color:var(--gold); }
+  .pane .wrap { padding:6px 22px calc(26px + env(safe-area-inset-bottom)) !important; max-width:none !important; }
+  .pane .pg-t { padding-right:44px; }
+  @media (max-width: 600px) { .pane-ov { align-items:flex-end; padding:0; } .pane { border-radius:18px 18px 0 0; max-height:92vh; width:100%; border-bottom:0; } }
+  .toast { position:fixed; left:50%; bottom:28px; transform:translateX(-50%); background:#1f1f1f; border:1px solid var(--gold-line); color:var(--text); padding:11px 18px; border-radius:10px; font-size:14px; opacity:0; transition:.2s; pointer-events:none; z-index:30; max-width:calc(100% - 32px); }
+  .toast.show { opacity:1; }
+  @media (max-width: 900px) { .g2, .g3 { grid-template-columns:1fr; } }
+  /* one grid: desktop = balanced columns, phone = app order (For you → News → Coming up → …) */
+  .jg { display:grid; gap:16px; grid-template-columns:repeat(12,minmax(0,1fr)); align-items:start; }
+  .jg > .a-foryou { grid-column:span 7; } .jg > .a-year { grid-column:span 5; } .jg > .a-news { grid-column:1/-1; }
+  .jg > .a-coming, .jg > .a-pastor, .jg > .a-ms { grid-column:span 4; }
+  .hero h1 { font-family:'Montserrat',sans-serif; font-weight:700; letter-spacing:-.01em; }
+  .hero .av.ini { display:flex; align-items:center; justify-content:center; font-weight:800; font-size:22px; color:var(--gold); background:var(--gold-bg); }
+  @media (max-width: 900px) {
+    .jg > * { grid-column:1/-1 !important; }
+    .jg > .a-foryou { order:1; } .jg > .a-news { order:2; } .jg > .a-coming { order:3; } .jg > .a-year { order:4; } .jg > .a-pastor { order:5; } .jg > .a-ms { order:6; }
+  }
+  @media (max-width: 640px) {
+    .wrap { padding:22px 16px 60px; } .top { padding:0 16px; } .top .t { display:none; }
+    .hero h1 { font-size:26px; } .path { overflow-x:auto; padding-bottom:6px; } .stop { min-width:96px; } .stop span { display:none; }
+    .card { padding:18px 16px; } .fact .k { width:78px; }
+  }
+  /* pathway badges · "persistent encouragement" (same icons as the dashboard + lobby poster) */
+  .badges { display:flex; gap:10px; flex-wrap:wrap; margin:-8px 0 22px; }
+  .badge { appearance:none; display:flex; flex-direction:column; align-items:center; gap:5px; width:74px; background:none; border:0; padding:0; cursor:pointer; font:700 11px 'Montserrat',sans-serif; color:var(--dim); }
+  .badge i { width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center; border:1.5px solid var(--line-2); background:var(--card); transition:transform .15s; }
+  .badge svg { width:22px; height:22px; fill:none; stroke:#6a655d; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
+  .badge.on { color:var(--text); } .badge.on i { background:var(--gold); border-color:var(--gold); } .badge.on svg { stroke:#1a1407; }
+  .badge:hover i { transform:translateY(-2px); }
+  @media (max-width:520px) {
+    .badges { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:4px; }
+    .badge { width:auto; font-size:10px; } .badge i { width:40px; height:40px; } .badge svg { width:19px; height:19px; }
+  }
+  @media (max-width:420px) { .top { gap:8px; } .top img { height:24px; } .top .btn.sm { padding:6px 9px; font-size:12px; } }
+  .seeyou { display:flex; gap:8px; flex-wrap:wrap; margin:-12px 0 22px; }
+  .seeyou span { background:var(--gold-bg); border:1px solid var(--gold-line); color:var(--text); border-radius:99px; padding:7px 13px; font-size:13.5px; line-height:1.3; }
+  .step.flash { animation:flash 1.6s ease; } @keyframes flash { 0%,60% { background:var(--gold-bg); } 100% { background:none; } }
+  .news { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:14px; }
+  .nv { display:flex; flex-direction:column; background:var(--card-2); border:1px solid var(--line); border-radius:12px; overflow:hidden; color:var(--text); text-decoration:none; min-width:0; }
+  .nv:hover { border-color:var(--line-2); }
+  .nv img { width:100%; aspect-ratio:16/9; object-fit:cover; background:#191919; display:block; }
+  .nv div { padding:11px 13px 13px; display:flex; flex-direction:column; gap:4px; }
+  .nv small { color:var(--muted); font-size:12.5px; } .nv b { font-size:15px; line-height:1.3; }
+  .nv em { align-self:flex-start; font-style:normal; font-size:11px; font-weight:800; letter-spacing:.04em; color:#1a1407; background:var(--gold); border-radius:99px; padding:2px 8px; margin-bottom:2px; }
+  /* ── the app shell: tabs (top bar on wide screens, bottom bar on phones) ── */
+  .ttabs { display:flex; gap:2px; margin-left:16px; }
+  .ttabs button, .seg button { appearance:none; background:none; border:0; display:inline-flex; align-items:center; gap:7px; padding:8px 12px; border-radius:9px; font:600 14px 'Montserrat',sans-serif; color:var(--muted); cursor:pointer; }
+  .ttabs button svg, .tabbar button svg, .seg button svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
+  .ttabs button:hover, .seg button:hover { color:var(--text); }
+  .ttabs button.on, .seg button.on { color:var(--gold); background:var(--gold-bg); }
+  .tabbar { display:none; }
+  .seg { display:flex; gap:4px; overflow-x:auto; margin:0 0 16px; padding-bottom:2px; scrollbar-width:none; } .seg::-webkit-scrollbar { display:none; } .seg button { flex:none; }
+  .ph h2 { margin:0 0 4px; font-size:26px; font-weight:700; letter-spacing:-.01em; } .ph p { margin:0 0 18px; font-size:14.5px; }
+  .jg > .a-side { grid-column:span 5; display:grid; gap:16px; align-content:start; }
+  .jg > .a-half { grid-column:span 6; }
+  .card-h a.c { color:var(--gold); text-decoration:none; font-weight:700; }
+  .sun-d { font-size:11.5px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); }
+  .sun-t { font-size:18px; font-weight:700; margin:6px 0 2px; line-height:1.3; }
+  .sun-times { margin-top:10px; font-weight:700; font-size:15px; }
+  .sun-x { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; } .sun-x span { font-size:12px; font-weight:700; background:var(--gold-bg); color:var(--gold); border-radius:99px; padding:4px 9px; }
+  /* Share page (formerly Plan a visit) */
+  .sh-opt { display:flex; gap:14px; align-items:flex-start; width:100%; text-align:left; background:var(--card-2); border:1px solid var(--line-2); border-radius:12px; padding:14px 16px; margin-bottom:10px; color:var(--text); font:inherit; cursor:pointer; }
+  .sh-opt:last-child { margin-bottom:0; } .sh-opt:hover { border-color:var(--gold-line); }
+  .sh-opt .ic { width:40px; height:40px; border-radius:11px; background:var(--gold-bg); border:1px solid var(--gold-line); flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+  .sh-opt .ic svg { width:20px; height:20px; stroke:var(--gold); fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  .sh-opt b { display:block; font-size:16px; margin-bottom:3px; } .sh-opt span { color:var(--muted); font-size:14px; line-height:1.5; }
+  .sh h4 { margin:16px 0 4px; font-size:12.5px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--gold); }
+  .sh p, .sh li { color:var(--muted); font-size:14.5px; line-height:1.65; } .sh p { margin:0 0 10px; } .sh ul, .sh ol { margin:0 0 6px; padding-left:20px; } .sh li { margin-bottom:5px; }
+  .sh label { display:block; font-weight:700; font-size:14.5px; margin:16px 0 4px; } .sh label:first-of-type { margin-top:0; }
+  .sh label small { display:block; font-weight:500; color:var(--dim); font-size:13px; line-height:1.5; margin-top:2px; }
+  .sh textarea { width:100%; min-height:84px; background:var(--card-2); border:1px solid var(--line-2); border-radius:10px; padding:12px 14px; font:15px/1.5 'Montserrat',sans-serif; color:var(--text); resize:vertical; }
+  .sh textarea:focus { outline:none; border-color:var(--gold-line); }
+  .sh .ex { background:var(--card-2); border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-bottom:10px; } .sh .ex b { font-size:14px; } .sh .ex p { margin:6px 0 0; }
+  .sh .res { display:block; padding:10px 0; border-top:1px solid var(--line); text-decoration:none; } .sh .res b { display:block; color:var(--gold); font-size:14.5px; } .sh .res span { color:var(--dim); font-size:13px; line-height:1.5; }
+  /* events */
+  .chips { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
+  .chips button { appearance:none; border:1px solid var(--line-2); background:var(--card); color:var(--muted); border-radius:99px; padding:8px 14px; font:600 13px 'Montserrat',sans-serif; cursor:pointer; min-height:38px; }
+  .chips button.on { background:var(--gold-bg); color:var(--gold); border-color:var(--gold-line); }
+  .evl { display:grid; gap:8px; max-width:820px; }
+  .evh { margin:14px 0 4px; font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim); }
+  .evr { appearance:none; display:grid; grid-template-columns:64px 1fr 20px; gap:12px; align-items:center; width:100%; text-align:left; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px; cursor:pointer; color:var(--text); font-family:inherit; }
+  .evr:hover { border-color:var(--line-2); }
+  .evr img, .evr .evd { width:64px; height:48px; border-radius:8px; object-fit:cover; background:var(--card-2); }
+  .evd { display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:11px; color:var(--muted); font-weight:700; } .evd b { font-size:18px; color:var(--text); line-height:1; }
+  .evt { min-width:0; } .evt b { display:block; font-size:15px; line-height:1.3; } .evt small { color:var(--muted); font-size:12.5px; }
+  .evt em { font-style:normal; font-size:10.5px; font-weight:800; color:#1a1407; background:var(--gold); border-radius:99px; padding:1px 7px; margin-bottom:3px; display:inline-block; }
+  .chv { width:18px; height:18px; fill:none; stroke:var(--dim); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; flex:none; }
+  .sheet { max-height:90vh; overflow:auto; }
+  .sh-img { width:100%; aspect-ratio:16/9; object-fit:cover; border-radius:12px; margin-bottom:12px; display:block; }
+  .sh-desc { color:var(--muted); font-size:14.5px; line-height:1.6; white-space:pre-line; max-height:32vh; overflow:auto; }
+  .sh-acts { display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; }
+  /* connect · give · me */
+  .pill { font-size:11px; font-weight:800; color:var(--gold); background:var(--gold-bg); border-radius:99px; padding:2px 8px; margin-left:6px; white-space:nowrap; }
+  .acts2 { margin-top:12px; display:flex; gap:8px; flex-wrap:wrap; }
+  .sub-h { margin:14px 0 2px; font-size:11.5px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); }
+  .search { width:100%; background:var(--card-2); border:1px solid var(--line-2); border-radius:10px; padding:11px 13px; font:500 15px 'Montserrat',sans-serif; color:var(--text); margin-bottom:8px; }
+  .search:focus { outline:none; border-color:var(--gold-line); }
+  .flist { display:grid; max-height:440px; overflow:auto; }
+  .frow { display:block; padding:11px 4px; border-top:1px solid var(--line); text-decoration:none; color:var(--text); } .frow:first-child { border-top:0; }
+  .frow b { display:block; font-size:14.5px; } .frow small { color:var(--muted); font-size:12.5px; } .frow:hover b { color:var(--gold); }
+  .give-hero .gtxt { font-size:16px; line-height:1.6; margin:0 0 16px; }
+  .give-acts { display:grid; gap:10px; } .btn.big { padding:14px 18px; font-size:16px; border-radius:12px; }
+  .ll { display:grid; }
+  .lrow { display:flex; align-items:center; gap:12px; padding:12px 2px; border-top:1px solid var(--line); text-decoration:none; color:var(--text); min-height:54px; }
+  .ll .lrow:first-child { border-top:0; }
+  .lrow .li { width:34px; height:34px; border-radius:10px; background:var(--gold-bg); display:flex; align-items:center; justify-content:center; flex:none; }
+  .lrow .li svg { width:18px; height:18px; fill:none; stroke:var(--gold); stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
+  .lrow .lt { flex:1; min-width:0; } .lrow .lt b { display:block; font-size:15px; font-weight:600; } .lrow .lt small { display:block; color:var(--muted); font-size:12.5px; margin-top:1px; }
+  .lrow:hover .lt b { color:var(--gold); }
+  .me-h { display:flex; align-items:center; gap:14px; margin-bottom:18px; } .me-h h2 { margin:0; font-size:24px; font-weight:700; }
+  .me-h .av { width:60px; height:60px; border-radius:50%; overflow:hidden; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:22px; color:var(--gold); background:var(--gold-bg); flex:none; } .me-h .av img { width:100%; height:100%; object-fit:cover; }
+  #s-me .path { margin:4px 0 18px; }
+  @media (max-width: 900px) { .jg > .a-side, .jg > .a-half { grid-column:1/-1 !important; } .jg > .a-side { order:2; } .jg > .a-news { order:3; } }
+  /* ── "You belong to Jesus." — the core belief, set large over South Reno's contour lines ── */
+  .belong { position:relative; overflow:hidden; border-radius:22px; padding:30px 28px 26px; margin-bottom:18px; border:1px solid var(--line);
+    background:radial-gradient(120% 140% at 0% 0%, var(--card) 35%, var(--gold-bg) 100%); }
+  .belong::before { content:''; position:absolute; inset:-10%; background:url(/assets/belong-topo.svg) center/cover no-repeat; opacity:.35; pointer-events:none; }
+  html[data-theme="soft"] .belong::before { opacity:.22; }
+  .belong > * { position:relative; }
+  .b-hi { display:flex; align-items:center; gap:10px; font-size:14px; font-weight:600; color:var(--muted); }
+  .b-av { width:30px; height:30px; border-radius:50%; object-fit:cover; display:inline-flex; align-items:center; justify-content:center; font-size:13px; font-weight:800; color:var(--gold); background:var(--gold-bg); flex:none; }
+  .b-h { margin:4px 0 14px; font-size:clamp(40px, 6vw, 64px); font-weight:800; line-height:1.02; letter-spacing:-.03em; }
+  .b-h em { font-style:normal; color:var(--gold); }
+  .b-v { margin:0; max-width:620px; font-size:15.5px; line-height:1.55; color:var(--text); opacity:.88; }
+  .b-v span { display:block; margin-top:8px; padding-top:8px; border-top:2px solid var(--gold); width:fit-content; font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+  .greet { margin:4px 0 14px; } .greet .b-hi { margin-bottom:12px; font-size:15px; color:var(--text); }
+  .b-k { font-size:11px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); margin-bottom:8px; }
+  .belong .badges { margin:0; }
+  .signin .b-h { font-size:40px; margin:22px 0 12px; }
+  .signin { position:relative; } .signin > * { position:relative; }
+  .signin::before { content:''; position:absolute; left:50%; top:0; width:min(760px, 100vw); height:330px; transform:translateX(-50%); background:url(/assets/belong-topo.svg) center/cover no-repeat; opacity:.3; pointer-events:none;
+    -webkit-mask-image:radial-gradient(closest-side, #000 40%, transparent); mask-image:radial-gradient(closest-side, #000 40%, transparent); }
+  html[data-theme="soft"] .signin::before { opacity:.2; }
+  .signin .b-v { margin:0 auto 22px; }
+  /* Home, simplified: belief → one personal card → For you → this Sunday / coming up → news */
+  .one .b-h { font-size:clamp(34px, 5vw, 54px); margin:0 0 12px; }
+  .one .b-v { font-size:15px; }
+  .me-card { margin-bottom:16px; }
+  .mc-top { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+  .mc-top .b-av { width:44px; height:44px; font-size:17px; }
+  .mc-top b { display:block; font-size:16.5px; } .mc-top p { margin:2px 0 0; color:var(--muted); font-size:14px; line-height:1.45; }
+  .me-card .b-k { margin-bottom:10px; }
+  .me-card .badges { display:grid; grid-template-columns:repeat(6, minmax(0, 64px)); gap:6px; margin:0; }
+  .me-card .badge { width:auto; font-size:10.5px; } .me-card .badge i { width:38px; height:38px; } .me-card .badge svg { width:18px; height:18px; }
+  @media (max-width: 900px) { .wide-only { display:none !important; } }
+  /* phones and tablets: a labeled bottom tab bar, like any app */
+  @media (max-width: 900px) {
+    body.app-in:not(.embed) .tabbar { display:flex; position:fixed; left:0; right:0; bottom:0; z-index:15; background:rgba(31,31,31,.96); border-top:1px solid var(--line); padding:4px 4px calc(4px + env(safe-area-inset-bottom)); -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px); justify-content:center; }
+    .tabbar button { flex:1; max-width:140px; appearance:none; background:none; border:0; display:flex; flex-direction:column; align-items:center; gap:3px; font:600 11px 'Montserrat',sans-serif; color:var(--dim); padding:6px 0; min-height:50px; cursor:pointer; }
+    .tabbar button svg { width:23px; height:23px; } .tabbar button.on { color:var(--gold); }
+    body.app-in:not(.embed) .wrap { padding-bottom:calc(100px + env(safe-area-inset-bottom)); }
+    .ttabs, .wide-only { display:none !important; }
+    .toast { bottom:calc(84px + env(safe-area-inset-bottom)); }
+  }
+  /* ── one continuous page: sections on a single surface, divided by space and a hairline ── */
+  .wrap.one .card, .wrap.one .evr, .wrap.one .me-card { background:none !important; border:0 !important; box-shadow:none !important; border-radius:0; padding:0; }
+  .one .sec { padding:36px 0 6px; border-top:1px solid var(--line); scroll-margin-top:76px; }
+  .one .sec:first-of-type { border-top:0; padding-top:4px; }
+  .one .jg { gap:30px 28px; }
+  @media (max-width: 900px) { .one .jg { grid-template-columns:1fr; } }
+  .one .jg + .jg, .one .jg[style] { margin-top:30px !important; }
+  .one .a-side { gap:30px; }
+  .one .belong { border:0; box-shadow:none !important; background:transparent; border-radius:0; padding:18px 0 26px; margin:0; }
+  .one .belong::before { inset:-30px -40px 0; -webkit-mask-image:linear-gradient(90deg, transparent, #000 30%, #000 70%, transparent); mask-image:linear-gradient(90deg, transparent, #000 30%, #000 70%, transparent); }
+  .one .me-card { margin:0 0 28px; }
+  .one .evr { border-top:1px solid var(--line) !important; padding:12px 0 !important; }
+  .one .evl { gap:0; } .one .evh { margin:20px 0 2px; }
+  .one .ev-more { margin-top:14px; justify-self:start; }
+  .one .ph h2 { font-size:24px; }
+  .one .sec > .quiet { border-top:0; }
+  html[data-theme="soft"] .one .sec { border-top-color:rgba(74,58,30,.09); }
+  html[data-theme="soft"] .one .evr { border-top-color:rgba(74,58,30,.07) !important; }
+  /* ── calm home: one column, big type, two cards, a short list of big links ── */
+  .home { max-width:620px; margin:0 auto; }
+  .home .hi { font-size:15px; font-weight:600; color:var(--muted); margin:6px 0 4px; }
+  .home .belong { padding:4px 0 30px; }
+  .wrap.one.home .b-h { font-size:clamp(46px, 11vw, 68px); line-height:.98; margin:0 0 14px; }
+  .lbl { font-size:11.5px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:var(--gold); margin-bottom:10px; }
+  .hcard { background:var(--card); border-radius:24px; padding:24px 22px 20px; margin:0 0 30px; box-shadow:0 1px 2px rgba(74,58,30,.05), 0 12px 32px rgba(74,58,30,.08); }
+  .hcard h2 { font-size:26px; line-height:1.2; margin:0 0 8px; font-weight:700; letter-spacing:-.015em; }
+  .hcard p { color:var(--muted); font-size:16px; line-height:1.55; margin:0 0 18px; }
+  .hcard .btn.big { width:100%; padding:15px 18px; font-size:16px; border-radius:14px; }
+  .hcard .nx { display:flex; justify-content:center; gap:10px; margin-top:12px; font-size:14px; color:var(--dim); }
+  .hcard .nx a { color:var(--muted); text-decoration:none; font-weight:600; }
+  .sun { margin:0 0 30px; padding:0 2px; }
+  .sun-big { font-size:clamp(28px, 7vw, 36px); line-height:1.12; font-weight:700; margin:0 0 8px; letter-spacing:-.02em; }
+  .sun-meta { color:var(--muted); font-size:15px; }
+  .rows .r { display:grid; grid-template-columns:96px 1fr; gap:12px; padding:13px 0; border-top:1px solid var(--line); font-size:16px; line-height:1.35; }
+  .rows .r:first-child { border-top:0; padding-top:2px; }
+  .rows .d { color:var(--muted); font-size:13px; font-weight:700; padding-top:2px; }
+  .hcard .more { display:inline-block; margin-top:6px; font-weight:700; font-size:14.5px; color:var(--gold); text-decoration:none; }
+  .biglinks { margin:4px 0 20px; }
+  .biglinks a { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:19px 2px; border-top:1px solid var(--line); font-size:22px; font-weight:600; letter-spacing:-.01em; color:var(--text); text-decoration:none; }
+  .biglinks a:last-child { border-bottom:1px solid var(--line); }
+  .biglinks a:hover { color:var(--gold); }
+  .biglinks .chv { width:22px; height:22px; }
+  .pg-back { appearance:none; background:none; border:0; padding:6px 0 14px; color:var(--gold); font:700 15px 'Montserrat',sans-serif; cursor:pointer; }
+  .top-me { appearance:none; width:36px; height:36px; border-radius:50%; border:0; padding:0; overflow:hidden; background:var(--gold-bg); color:var(--gold); font:800 15px 'Montserrat',sans-serif; cursor:pointer; }
+  .top-me img { width:100%; height:100%; object-fit:cover; }
+  .grat { font-size:17px; line-height:1.5; margin:-4px 0 22px; }
+  .tabbar:empty, .ttabs:empty { display:none !important; }
+  @media (min-width: 901px) { body.app-in:not(.embed) .wrap.one { padding-bottom:48px !important; } }
+  html[data-theme="soft"] .biglinks a, html[data-theme="soft"] .rows .r { border-color:rgba(74,58,30,.08); }
+  /* ── Home, like the talk's app: header band · For You · News & Events ── */
+  .home { max-width:560px; }
+  html[data-theme] .band { position:relative; overflow:hidden; text-align:center; color:#fff; border-radius:0 0 30px 30px; margin:-30px -24px 26px; padding:34px 22px 22px;
+    background:linear-gradient(165deg, #2c2418 0%, #5a4520 55%, #8e6d22 100%); }
+  html[data-theme] .band::before { content:''; position:absolute; inset:0; background:url(/assets/belong-topo.svg) center/cover no-repeat; opacity:.18; filter:invert(1) sepia(.4); pointer-events:none; }
+  html[data-theme] .band > * { position:relative; }
+  html[data-theme] .band-av { width:78px; height:78px; margin:0 auto 10px; border-radius:50%; overflow:hidden; border:3px solid rgba(255,255,255,.85); display:flex; align-items:center; justify-content:center; font:800 28px 'Montserrat',sans-serif; color:#fff; background:rgba(255,255,255,.14); }
+  html[data-theme] .band-av img { width:100%; height:100%; object-fit:cover; }
+  html[data-theme] .band-hi { font-size:15px; font-weight:600; color:rgba(255,255,255,.82); }
+  html[data-theme] .band-h { margin:6px 0 18px; font-size:clamp(30px, 8vw, 40px); font-weight:800; line-height:1.05; letter-spacing:-.02em; color:#fff; }
+  html[data-theme] .band-h em { font-style:normal; color:#f0cf7a; }
+  html[data-theme] .band .badges { display:flex; justify-content:center; gap:8px; margin:0; flex-wrap:nowrap; }
+  html[data-theme] .band .badge { width:auto; color:rgba(255,255,255,.85); font-size:10.5px; }
+  html[data-theme] .band .badge i { width:42px; height:42px; border:1.5px solid rgba(255,255,255,.45); background:transparent; }
+  html[data-theme] .band .badge svg { stroke:rgba(255,255,255,.85); width:19px; height:19px; }
+  html[data-theme] .band .badge.on i { background:#fff; border-color:#fff; }
+  html[data-theme] .band .badge.on svg { stroke:#6b5220; }
+  html[data-theme] .band-help { appearance:none; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.6); color:#fff; border-radius:99px; font:600 12px 'Montserrat',sans-serif; padding:6px 14px; margin-top:10px; cursor:pointer; }
+  html[data-theme] .band-help:hover { background:rgba(255,255,255,.22); }
+  .sheet.help { max-height:88vh; overflow-y:auto; -webkit-overflow-scrolling:touch; position:relative; }
+  .help-x { position:sticky; top:0; float:right; width:36px; height:36px; margin:-8px -10px 0 8px; border-radius:50%; border:1px solid var(--line-2); background:var(--card-2); color:var(--text); font-size:15px; cursor:pointer; }
+  .help .hgrid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:14px 0; }
+  .help .hbox { border:1px solid var(--line-2); border-radius:14px; padding:12px 8px; text-align:center; }
+  .help .hicons { display:flex; justify-content:center; gap:6px; margin-bottom:8px; }
+  .help .badge { cursor:default; width:62px; } .help .badge:hover i { transform:none; }
+  .help .hbox b { display:block; font-size:13px; margin-bottom:3px; } .help .hbox span { display:block; font-size:12px; line-height:1.45; color:var(--muted); }
+  .help ul.hl { list-style:none; margin:10px 0 0; padding:0; } .help ul.hl li { display:flex; gap:10px; align-items:flex-start; padding:7px 0; font-size:13.5px; line-height:1.45; color:var(--muted); border-top:1px solid var(--line); }
+  .help ul.hl svg { flex:none; width:20px; height:20px; margin-top:1px; fill:none; stroke:var(--gold); stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; } .help ul.hl b { color:var(--text); }
+  .badge.act i { border-color:var(--gold-line); } .badge.act svg { stroke:var(--gold); }
+  html[data-theme] .band .badge.act i { border-color:rgba(255,255,255,.8); border-style:dashed; } html[data-theme] .band .badge.act svg { stroke:#fff; }
+  html[data-theme] .band-tip { margin-top:12px; font-size:12px; color:rgba(255,255,255,.8); }
+  .h-lbl { display:flex; justify-content:space-between; align-items:baseline; margin:4px 2px 10px; font-size:18px; font-weight:700; letter-spacing:-.01em; }
+  .h-lbl a { font-size:14px; font-weight:700; color:var(--gold); text-decoration:none; }
+  .fy { background:var(--card); border-radius:22px; overflow:hidden; margin:0 0 28px; box-shadow:0 1px 2px rgba(74,58,30,.05), 0 12px 32px rgba(74,58,30,.08); }
+  .fy-img { aspect-ratio:16/9; background:linear-gradient(135deg, var(--gold-bg), transparent); display:flex; align-items:center; justify-content:center; }
+  .fy-img svg { width:56px; height:56px; fill:none; stroke:var(--gold); stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
+  .fy-img.has { background:none; } .fy-img img { width:100%; height:100%; object-fit:cover; display:block; }
+  html[data-theme] .fy-img.art { position:relative; overflow:hidden; background:linear-gradient(165deg, #2c2418 0%, #5a4520 55%, #8e6d22 100%); }
+  html[data-theme] .fy-img.art::before { content:''; position:absolute; inset:0; background:url(/assets/belong-topo.svg) center/cover no-repeat; opacity:.2; filter:invert(1) sepia(.4); }
+  html[data-theme] .fy-art { position:relative; display:flex; flex-direction:column; align-items:center; gap:6px; color:#fff; text-align:center; }
+  html[data-theme] .fy-art svg { width:64px; height:64px; stroke:#f1d488; stroke-width:1.4; }
+  html[data-theme] .fy-art b { font-size:24px; font-weight:800; letter-spacing:-.01em; }
+  html[data-theme] .fy-art small { font-size:12px; letter-spacing:.16em; text-transform:uppercase; opacity:.85; }
+  /* Our own step photo with the app's warm gold-brown wash and the step's title on top */
+  .fy-img.ov { position:relative; overflow:hidden; }
+  html[data-theme] .fy-ov { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; padding:16px; text-align:center; color:#fff;
+    background:linear-gradient(165deg, rgba(44,36,24,.66) 0%, rgba(90,69,32,.5) 55%, rgba(142,109,34,.42) 100%); }
+  .fy-img.poster img { filter:blur(1.5px); transform:scale(1.05); }   /* event posters have their own words: soften them into a backdrop */
+  html[data-theme] .fy-img.poster .fy-ov { background:linear-gradient(165deg, rgba(44,36,24,.74) 0%, rgba(90,69,32,.62) 55%, rgba(142,109,34,.54) 100%); }
+  html[data-theme] .fy-ov svg { width:40px; height:40px; fill:none; stroke:#f1d488; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
+  html[data-theme] .fy-ov b { font-size:30px; font-weight:800; letter-spacing:-.01em; line-height:1.05; text-shadow:0 2px 14px rgba(0,0,0,.35); }
+  html[data-theme] .fy-ov small { font-size:12px; font-weight:600; letter-spacing:.16em; text-transform:uppercase; opacity:.9; }
+  .fy-b { padding:18px 20px 16px; }
+  .fy h2 { font-size:21px; line-height:1.25; margin:0 0 8px; font-weight:700; letter-spacing:-.01em; }
+  .fy p { color:var(--muted); font-size:15px; line-height:1.55; margin:0 0 16px; }
+  .fy .btn.big { width:100%; padding:14px 18px; font-size:16px; border-radius:14px; }
+  .fy .nx { display:flex; justify-content:center; gap:18px; margin-top:12px; font-size:14px; }
+  .fy .nx a { color:var(--muted); text-decoration:none; font-weight:600; }
+  .news2 { min-height:270px; display:flex; gap:14px; overflow-x:auto; scroll-snap-type:x mandatory; scroll-padding:0 24px; margin:0 -24px 10px; padding:0 24px 8px; scrollbar-width:none; }
+  .news2::-webkit-scrollbar { display:none; }
+  .nc { appearance:none; flex:0 0 82%; max-width:400px; scroll-snap-align:start; text-align:left; padding:0; border:0; border-radius:20px; overflow:hidden; background:var(--card); color:var(--text); cursor:pointer; font-family:inherit; box-shadow:0 1px 2px rgba(74,58,30,.05), 0 10px 26px rgba(74,58,30,.07); }
+  .nc img, .nc-ph { display:block; width:100%; aspect-ratio:16/9; object-fit:cover; background:var(--card-2); }
+  .nc-b { display:block; padding:12px 16px 15px; } .nc-b small { display:block; font-size:12px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--gold); margin-bottom:4px; }
+  .nc-b b { display:block; font-size:17px; line-height:1.3; } .nc-b em { display:block; font-style:normal; color:var(--muted); font-size:13.5px; margin-top:3px; }
+  @media (min-width: 641px) { html[data-theme] .band { margin:0 0 26px; border-radius:28px; } .news2 { margin:0 0 10px; padding:0 0 8px; scroll-padding:0; } }
+  /* ── inner pages in Home's language: big title, small labels, a few simple cards of rows ── */
+  .wrap.one.page { max-width:560px; margin:0 auto; }
+  .pg-t { font-size:32px; font-weight:800; letter-spacing:-.02em; line-height:1.08; margin:8px 0 6px; }
+  .pg-s { color:var(--muted); font-size:15.5px; margin:0 0 22px; line-height:1.5; }
+  .sc { background:var(--card); border-radius:22px; padding:2px 18px; margin:0 0 26px; box-shadow:0 1px 2px rgba(74,58,30,.05), 0 10px 28px rgba(74,58,30,.07); }
+  .sc.pad { padding:20px; }
+  .sr { display:flex; align-items:center; gap:12px; padding:15px 0; border-top:1px solid var(--line); color:var(--text); text-decoration:none; min-height:58px; }
+  .sc > .sr:first-child, .sc > div > .sr:first-child, .sc > summary .sr, .sc > #grpList > .sr:first-child { border-top:0; }
+  .sr > span { flex:1; min-width:0; } .sr b { display:block; font-size:16px; font-weight:600; line-height:1.3; } .sr small { display:block; color:var(--muted); font-size:13.5px; margin-top:2px; line-height:1.4; }
+  .sr em { font-style:normal; color:var(--muted); font-size:13px; }
+  a.sr:hover b { color:var(--gold); }
+  .sr-more { color:var(--muted); font-size:13px; padding:12px 0 14px; border-top:1px solid var(--line); }
+  .sc .search { margin:14px 0 4px; }
+  .roster-d summary { list-style:none; cursor:pointer; } .roster-d summary::-webkit-details-marker { display:none; }
+  .roster-d[open] summary .chv { transform:rotate(90deg); } .roster-in { padding-bottom:12px; }
+  .roster-in .card { padding:0; margin-top:6px !important; background:none !important; box-shadow:none !important; }
+  .gtxt { font-size:16.5px; line-height:1.55; margin:0 0 16px; }
+  .give-2 { margin-top:10px; } .give-2 .btn, .sc.pad .btn.big { width:100%; }
+  .fine2 { color:var(--muted); font-size:12.5px; margin:12px 0 0; text-align:center; }
+  .me-top { text-align:center; margin:4px 0 24px; }
+  .me-av { width:84px; height:84px; margin:0 auto 10px; border-radius:50%; overflow:hidden; display:flex; align-items:center; justify-content:center; font:800 30px 'Montserrat',sans-serif; color:var(--gold); background:var(--gold-bg); }
+  .me-av img { width:100%; height:100%; object-fit:cover; }
+  .me-av.tap { cursor:pointer; }
+  .pf-ph { display:flex; align-items:center; gap:16px; margin:16px 0 6px; } .pf-ph .me-av { margin:0; width:72px; height:72px; font-size:26px; flex-shrink:0; }
+  .pf-l { display:block; margin-top:14px; } .pf-l > span { display:block; font-size:12.5px; font-weight:700; color:var(--muted); margin-bottom:6px; }
+  .pf-l small { display:block; color:var(--dim); font-size:12px; margin-top:5px; }
+  .pf-i { width:100%; background:var(--card-2); border:1px solid var(--line-2); border-radius:10px; padding:12px 14px; font:500 16px 'Montserrat',sans-serif; color:var(--text); }
+  .pf-i + .pf-i, .pf-i + .pf-row { margin-top:8px; } .pf-i:focus { outline:none; border-color:var(--gold-line); }
+  .pf-row { display:flex; gap:8px; } .pf-row .pf-i { min-width:0; } .pf-row .st { flex:0 0 76px; } .pf-row .zp { flex:0 0 96px; } .pf-row .pf-i + .pf-i { margin-top:0; }
+  .pf-btns { display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
+  .pf-ft { color:var(--dim); font-size:12.5px; margin:14px 0 0; text-align:center; }
+  .pf-ft a.pf-del { color:#b4483a; }
+  .btn.p.del { background:#b4483a; border-color:#b4483a; color:#fff; }
+  .pf-sum { margin:14px 0 10px; } .pf-sum > div { padding:11px 0; border-bottom:1px solid var(--line); } .pf-sum > div:last-child { border-bottom:0; }
+  .pf-sum b { display:block; font-size:12.5px; color:var(--muted); margin-bottom:4px; }
+  .pf-sum s { display:block; color:var(--dim); font-size:14px; } .pf-sum span { display:block; font-size:15px; font-weight:600; }
+  .pf-new { width:72px; height:72px; border-radius:50%; object-fit:cover; }
+  html[data-theme="soft"] .pf-i { border-color:transparent; background:rgba(74,58,30,.06); }
+  .me-top .pg-s { margin-bottom:10px; } .me-top .grat { margin:0; color:var(--text); font-size:16px; }
+  .ms2 .sr { min-height:0; padding:11px 0; }
+  .quiet2 { color:var(--muted); font-size:12.5px; line-height:1.6; text-align:center; margin:4px 8px 20px; }
+  .wrap.one .sc .evr { border-top:1px solid var(--line) !important; } .wrap.one .sc .evr:first-of-type { border-top:0 !important; }
+  .sc .evh { margin:16px 0 0; } .sc .ev-more { margin:12px 0 16px; }
+  html[data-theme="soft"] .sr, html[data-theme="soft"] .sr-more { border-top-color:rgba(74,58,30,.08); }
+  /* Your rhythm: one cell per week, last 26 weeks (group attendance · serving) */
+  .rhy { padding:16px 18px 14px; }
+  .rhy-r + .rhy-r { margin-top:16px; padding-top:14px; border-top:1px solid var(--line); }
+  .rhy-h { display:flex; align-items:baseline; gap:10px; }
+  .rhy-h b { flex:1; min-width:0; font-size:15.5px; font-weight:700; }
+  .rhy-h em { font-style:normal; font-size:13px; font-weight:700; color:var(--gold); white-space:nowrap; }
+  .rhy-s { color:var(--muted); font-size:13px; line-height:1.45; margin:2px 0 10px; }
+  .rhy-s a { font-weight:700; text-decoration:none; }
+  .rhy-w { display:flex; gap:3px; }
+  .rhy-w i { flex:1; height:22px; border-radius:4px; background:var(--line); }
+  .rhy-w i.on { background:var(--gold); }
+  .rhy-w i.now { box-shadow:inset 0 0 0 1.5px var(--gold-line); }
+  .rhy-w i.on.now { box-shadow:none; }
+  .rhy-w button { appearance:none; border:0; padding:0; margin:0; flex:1; height:22px; border-radius:4px; background:var(--line); cursor:pointer; font:inherit; }
+  .rhy-w button.on { background:var(--gold); } .rhy-w button.now { box-shadow:inset 0 0 0 1.5px var(--gold-line); } .rhy-w button.on.now { box-shadow:none; }
+  .rhy-w button.todo { box-shadow:inset 0 0 0 1.5px var(--gold); background:transparent; }
+  html[data-theme="soft"] .rhy-w button:not(.on):not(.todo) { background:rgba(74,58,30,.09); }
+  .rhy-tip { color:var(--dim); font-size:11.5px; margin-top:8px; }
+  /* Serving → what's needed in the next four Sundays */
+  .svo { margin-top:14px; padding-top:12px; border-top:1px dashed var(--line); }
+  .svo-h { display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:8px; }
+  .svo-h b { font-size:13.5px; font-weight:700; } .svo-h span { color:var(--dim); font-size:11.5px; }
+  .svo-wk { display:flex; gap:6px; overflow-x:auto; margin:0 -2px 6px; padding:2px; -webkit-overflow-scrolling:touch; }
+  .svo-wk button { appearance:none; flex:1 0 auto; min-width:64px; border:1px solid var(--line); background:none; color:var(--muted); border-radius:10px; padding:6px 10px; font:inherit; font-size:12.5px; font-weight:700; cursor:pointer; line-height:1.25; text-align:center; }
+  .svo-wk button small { display:block; font-size:11px; font-weight:600; opacity:.8; }
+  .svo-wk button.on { background:var(--gold-bg); border-color:var(--gold); color:var(--text, inherit); }
+  .svo-k { margin:12px 0 2px; color:var(--gold); font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+  .svo-t { padding:9px 0; border-top:1px solid var(--line); } .svo-k + .svo-t { border-top:0; }
+  .svo-tn { font-size:14.5px; font-weight:700; }
+  .svo-tn em { font-style:normal; color:var(--muted); font-weight:600; font-size:12.5px; margin-left:6px; }
+  .svo-p { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:6px 0 0; }
+  .svo-p > span { flex:1 1 140px; min-width:0; font-size:13.5px; color:var(--muted); line-height:1.35; }
+  .svo-p > span b { color:var(--text, inherit); font-weight:700; }
+  .svo-a { display:flex; gap:6px; flex:0 0 auto; }
+  .svo-a .btn { padding:6px 12px; min-height:34px; font-size:13px; }
+  .svo-pend { font-size:12.5px; font-weight:700; color:var(--gold); white-space:nowrap; }
+  .svo-e { color:var(--muted); font-size:13px; padding:6px 0; }
+  .svo-r { background:var(--gold-bg); border-radius:10px; padding:9px 12px; margin-top:8px; font-size:13.5px; }
+  .svo-r .svo-a { margin-top:6px; }
+  .rd { padding:12px 0; border-top:1px solid var(--line); } .rd:first-of-type { border-top:0; }
+  .rd small { display:block; color:var(--muted); font-size:12.5px; font-weight:600; }
+  .rd b { display:block; font-size:16px; margin:2px 0 4px; }
+  .rd p { margin:0; color:var(--muted); font-size:14px; line-height:1.5; }
+  .rd .ok { color:var(--gold); font-weight:700; }
+  .rd-names { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+  .rd-names span { background:var(--gold-bg); border-radius:99px; padding:5px 11px; font-size:13px; font-weight:600; }
+  .rd .btn { margin-top:12px; display:block; width:100%; text-align:center; box-sizing:border-box; }
+  html[data-theme="soft"] .rd { border-top-color:rgba(74,58,30,.08); }
+  .rhy-m { display:flex; gap:3px; margin-top:6px; }
+  .rhy-m span { flex:1; min-width:0; overflow:visible; white-space:nowrap; font-size:10.5px; font-weight:600; color:var(--dim); }
+  .rhy-k { display:flex; gap:14px; margin-top:12px; font-size:11.5px; color:var(--dim); }
+  .rhy-k span::before { content:''; display:inline-block; width:10px; height:10px; border-radius:3px; background:var(--gold); margin-right:5px; vertical-align:-1px; }
+  .rhy-k span.off::before { background:var(--line); }
+  html[data-theme="soft"] .rhy-w i:not(.on), html[data-theme="soft"] .rhy-k span.off::before { background:rgba(74,58,30,.09); }
+  html[data-theme="soft"] .rhy-r + .rhy-r { border-top-color:rgba(74,58,30,.08); }
+  /* phone = the member app (kept last so it wins over the base rules above) */
+  @media (max-width: 640px) {
+    /* app header: centered greeting, badges, encouragement */
+    .hero { flex-direction:column; text-align:center; gap:10px; margin-bottom:16px; }
+    .hero .av { width:72px; height:72px; }
+    .hero .s { font-size:14px; }
+    .badges { margin:0 0 14px; }
+    .seeyou { flex-wrap:nowrap; overflow-x:auto; margin:0 -16px 18px; padding:0 16px 2px; scrollbar-width:none; }
+    .seeyou::-webkit-scrollbar { display:none; }
+    .seeyou span { flex:none; }
+    .path { margin:0 0 18px; }
+    .step .acts .btn.p { flex:1; min-height:44px; } .step .acts .btn.g { min-height:44px; }
+    .step b { font-size:16px; }
+    .news { display:flex; overflow-x:auto; scroll-snap-type:x mandatory; gap:12px; margin:0 -16px; padding:0 16px 4px; scrollbar-width:none; }
+    .news::-webkit-scrollbar { display:none; }
+    .news .nv { flex:0 0 78%; scroll-snap-align:start; }
+    .card-h h3 { font-size:12px; }
+    .path { scrollbar-width:none; } .path::-webkit-scrollbar { display:none; }
+    html[data-theme] .band { margin:-22px -16px 22px; }
+    .news2 { margin:0 -16px 10px; padding:0 16px 8px; scroll-padding:0 16px; }
+    .one .b-h { font-size:36px; }
+    .me-card .badges { grid-template-columns:repeat(6, minmax(0, 1fr)); }
+    .belong { padding:20px 18px 18px; border-radius:18px; margin:0 -4px 14px; }
+    .b-h { font-size:40px; margin:2px 0 12px; } .b-v { font-size:14.5px; margin-bottom:2px; }
+    .signin .b-h { font-size:36px; }
+    .ph h2 { font-size:24px; }
+    .chips { flex-wrap:nowrap; overflow-x:auto; margin:0 -16px 12px; padding:0 16px 2px; scrollbar-width:none; } .chips::-webkit-scrollbar { display:none; } .chips button { flex:none; }
+    .evr { grid-template-columns:56px 1fr 18px; } .evr img, .evr .evd { width:56px; height:44px; }
+    .sh-acts .btn { flex:1 1 45%; min-height:46px; }
+    .me-h .av { width:54px; height:54px; }
+    .t-home .hero { gap:6px; margin-bottom:12px; } .t-home .hero .av { width:52px; height:52px; font-size:19px; }
+    .t-home .hero h1 { font-size:24px; } .t-home .hero .s { font-size:13.5px; line-height:1.5; }
+    .fact .k.dk { width:auto; min-width:92px; white-space:nowrap; }
+    .flist { max-height:none; overflow:visible; }
+  }
+  /* "Get the app" card (phones that haven't installed it yet) */
+  .getapp { display:flex; gap:14px; align-items:center; background:var(--card); border:1px solid var(--gold-line); border-radius:14px; padding:14px 16px; margin:0 0 18px; }
+  .getapp img { width:52px; height:52px; border-radius:12px; flex:none; }
+  .getapp b { display:block; font-size:15px; margin-bottom:2px; }
+  .getapp p { margin:0; color:var(--muted); font-size:13.5px; line-height:1.45; }
+  .getapp p svg { width:15px; height:15px; vertical-align:-2px; color:var(--gold); }
+  .getapp .acts { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+  .getapp .acts .btn.p { min-height:40px; }
+  .standalone .top { padding-top:env(safe-area-inset-top); height:calc(60px + env(safe-area-inset-top)); }
+  html[data-theme="soft"] .btn.p, html[data-theme="soft"] .nv em { color:#fff; }
+  /* sleek (Soft): no outlines — shadows lift cards, soft fills mark buttons and fields */
+  html[data-theme="soft"] .card, html[data-theme="soft"] .evr, html[data-theme="soft"] .belong { border-color:transparent; box-shadow:0 1px 2px rgba(74,58,30,.05), 0 6px 22px rgba(74,58,30,.06); }
+  html[data-theme="soft"] .btn:not(.p) { border-color:transparent; background:rgba(74,58,30,.06); }
+  html[data-theme="soft"] .chips button, html[data-theme="soft"] .field, html[data-theme="soft"] .search, html[data-theme="soft"] .sheet textarea { border-color:transparent; background:rgba(74,58,30,.06); }
+  html[data-theme="soft"] .chips button.on { background:#f3ecdb; }
+  html[data-theme="soft"] .badge i { border-color:transparent; background:rgba(74,58,30,.06); }
+  html[data-theme="soft"] .badge.on i { background:var(--gold); }
+  html[data-theme="soft"] .step .ic, html[data-theme="soft"] .getapp { border-color:transparent; }   /* white on the soft bronze (dark ink was 3.6:1) */
+  html[data-theme="soft"] .top { background:rgba(255,255,255,.9); backdrop-filter:saturate(1.2) blur(12px); -webkit-backdrop-filter:saturate(1.2) blur(12px); }
+</style>
+</head>
+<body>
+<div class="top"><img src="/assets/ls-lockup-white.png" alt="Living Stones South Reno"><nav class="ttabs" id="ttabs" aria-label="App sections"></nav><div class="r" id="topR"></div></div>
+<div id="banner"></div>
+<div id="app"><div class="loading">Loading…</div></div>
+<div class="sheet-ov" id="sheetOv" onclick="if(event.target===this)closeSheet()"><div class="sheet" id="sheet"></div></div>
+<div class="pane-ov" id="paneOv" onclick="if(event.target===this)closePane()"><div class="pane" id="pane" role="dialog" aria-modal="true" aria-label="Details"><button class="pane-x" id="paneX" onclick="closePane()" aria-label="Close">&#10005;</button><div id="paneBody"></div></div></div>
+<div class="toast" id="toast"></div>
+<nav class="tabbar" id="tabbar" aria-label="App sections"></nav>
+
+<script>
+const API = 'https://script.google.com/macros/s/AKfycbx-YDZg924fyFkG2U69o6Z0BBTLsh8ZAUvwK4fxSkW7LKGiXlxn5s2jyq9GCDxwA_sANA/exec';
+const TOKEN_KEY = 'lssr_journey_token';
+const DISMISS_KEY = 'lssr_journey_dismiss';
+const S = { cfg: null, data: null, phone: '', ticket: '', preview: '', pw: '' };
+
+const $ = id => document.getElementById(id);
+const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+function tokenGet() { try { return localStorage.getItem(TOKEN_KEY) || ''; } catch (e) { return ''; } }
+function tokenSet(t) { try { t ? localStorage.setItem(TOKEN_KEY, t) : (localStorage.removeItem(TOKEN_KEY), localStorage.removeItem(ID_KEY)); } catch (e) {} }
+// One login: the dashboard reads who verified (last 4 of the texted number + PCO name) to decide staff / pastor / leader access.
+const ID_KEY = 'lssr_id';
+function idSet(patch) { try { localStorage.setItem(ID_KEY, JSON.stringify(Object.assign(JSON.parse(localStorage.getItem(ID_KEY) || '{}'), patch))); } catch (e) {} }
+// Digits only; a leading US country code (+1 / 1) is dropped so every format becomes the same 10 digits.
+function phoneDigits(v) { const d = String(v || '').replace(/\D/g, ''); return d.length === 11 && d[0] === '1' ? d.slice(1) : d; }
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast._h); toast._h = setTimeout(() => t.classList.remove('show'), 2800); }
+// Requests go as GET (…/exec?action=jr&p=<json>): Google answers every call with a redirect,
+// and when a browser is signed into Google a POST body can be dropped on the way — the server
+// then sees an empty request and returns a generic {ok:true}. Every reply names the action it
+// answers (`for`); anything else is treated as a failed try. Long notes still go by POST.
+// ── DEMO sign-in: (775) 555-5555 shows the app as a made-up member would see it (Gary Phillips: baptized and in a
+// community group; not a Family Member, not serving, not giving, not staff or pastor). Everything is built here in the
+// browser — nothing goes to the server, no real person's data is used, and nothing a demo user does is saved.
+const DEMO_PHONE = '7755555555', DEMO_TOKEN = 'demo-member-sam-sample-0000000000';
+function isDemo() { return tokenGet() === DEMO_TOKEN; }
+function demoMe() {
+  const firstSun = (() => { const d = new Date(); for (let i = 0; i < 70; i++) { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate() + i); if (x.getDay() === 0 && x.getDate() <= 7) return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); } return ''; })();
+  const L = { groups: 'https://lssr.churchcenter.com/groups', serve: 'https://lssr.churchcenter.com/groups/serve-teams?enrollment=open_signup%2Crequest_to_join&filter=enrollment',
+    giving: 'https://lssr.churchcenter.com/giving', baptism: 'https://lssr.churchcenter.com/people/forms/764941', membership: 'https://livingstoneschurches.com/lssr-membership', churchCenter: 'https://lssr.churchcenter.com/me' };
+  return { ok: true, for: 'jr_me', demo: true,
+    person: { first: 'Gary', name: 'Gary Phillips', avatar: '/assets/photos/gary-2.jpg', since: '2025-03-02', membership: 'Attender' }, spouse: null, kids: [],
+    season: 'growing', groups: [{ name: 'Tuesday Night Community Group', leader: false, joined: '2026-02-10' }], otherGroups: 0,
+    serving: { teams: [], servedThisYear: 0 }, giving: { months: 0, recurring: false, lastDays: null, any: false },
+    baptizedDate: '2025-09-07', memberSince: '', baptized: true, member: false, baptism: { requested: false, ready: false, plan: null },
+    milestones: [{ label: 'First connected with Living Stones', date: '2025-03-02' }, { label: 'Baptized', date: '2025-09-07' }, { label: 'Joined Tuesday Night Community Group', date: '2026-02-10' }],
+    upcoming: firstSun ? [{ date: firstSun, what: 'Baptism Sunday — know someone who’s ready? Invite them' }] : [],
+    pastor: null, leading: null, links: L, asOf: new Date().toISOString(),
+    steps: [
+      { id: 'membership', title: 'It’s time to fully belong at Living Stones', why: 'If Living Stones feels like home, membership is how we say “we’re in this together” — you’ll meet a pastor and hear our story.', btn: 'Learn more', url: L.membership },
+      { id: 'serve', title: 'Find a place to serve', why: 'Serving is one of the best ways to belong — you meet people, use your gifts, and help someone else take their next step.', btn: 'Find a team', url: L.serve },
+      { id: 'give', title: 'Generosity is part of the journey', why: 'Giving is an act of worship and trust. Wherever you are, you can start small — and we’re grateful for every step.', btn: 'Give online', url: L.giving }
+    ] };
+}
+// Gary's rhythm: at the Tuesday group most weeks (missed a few), not on a serve team yet.
+function demoRhythm() {
+  const k = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  const t = new Date(); t.setHours(12, 0, 0, 0);
+  const from = new Date(t); from.setDate(t.getDate() - 26 * 7);
+  const tue = new Date(t); tue.setDate(t.getDate() - ((t.getDay() + 5) % 7));   // the latest Tuesday (today if Tuesday)
+  const dates = [];
+  for (let i = 0; i < 26; i++) { const d = new Date(tue); d.setDate(tue.getDate() - 7 * i); if (d < from) break; if (d >= new Date('2026-02-10T12:00:00') && [2, 5, 6, 11, 17, 18].indexOf(i) < 0) dates.push(k(d)); }
+  dates.sort();
+  const list = [];   // every Tuesday the group met: Gary's there on the dates above; two meetings had no attendance taken
+  for (let i = 0; i < 26; i++) { const d = new Date(tue); d.setDate(tue.getDate() - 7 * i); if (d < from || d < new Date('2026-02-10T12:00:00')) break; const kk = k(d), took = [5, 11].indexOf(i) < 0;
+    list.push({ d: kk, g: 'Tuesday Night Community Group', n: took ? 7 + (i % 4) : 0, me: took && dates.indexOf(kk) >= 0, took: took, leader: false, url: '' }); }
+  list.sort((a, b) => a.d < b.d ? -1 : 1);
+  return { ok: true, for: 'jr_rhythm', demo: true, from: k(from), today: k(t), weeks: 26, asOf: new Date().toISOString(),
+    group: { inGroup: true, names: ['Tuesday Night Community Group'], tracked: true, dates: dates, last: dates[dates.length - 1] || '', meetings: list.length, list: list, leads: false },
+    serve: { onTeam: false, dates: [], last: '', next: '', list: [] } };
+}
+function demoApi(body) {
+  const a = body.action;
+  if (a === 'jr_me') return demoMe();
+  if (a === 'jr_rhythm') return demoRhythm();
+  if (a === 'jr_note') { toast('Demo — nothing was sent'); return { ok: true, for: a, demo: true }; }
+  if (a === 'jr_access') return { ok: true, for: a, staff: null, pastor: null };
+  if (a === 'jr_profile') return { ok: true, for: a, demo: true, profile: { legalFirst: 'Gary', nickname: '', last: 'Phillips', avatar: '/assets/photos/gary-2.jpg', email: 'gary.phillips@example.com', phone: '(775) 555-5555',
+    address: { street1: '123 Sample St', street2: '', city: 'Reno', state: 'NV', zip: '89511' }, birthdate: '1990-05-12' } };
+  if (a === 'jr_profile_update') { toast('Demo — nothing was saved'); return { ok: true, for: a, demo: true, changed: [], failed: [] }; }
+  return { ok: true, for: a };
+}
+// The fast API (Cloudflare Worker, Fast Backend Plan P2) builds the Me page and the rhythm chart in ~2 s
+// (Apps Script: 5–55 s). Only a good answer is used; anything else asks Apps Script exactly as before.
+const FAST = 'https://api.lssouthreno.com';
+async function fastJr(body) {
+  if (S.preview || !body.token || !/^jr_(me|rhythm)$/.test(body.action)) return null;
+  try {
+    const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 20000);
+    const r = await fetch(FAST + '/jr/' + (body.action === 'jr_me' ? 'me' : 'rhythm') + (body.fresh ? '?fresh=1' : ''),
+      { headers: { Authorization: 'Bearer ' + body.token }, cache: 'no-store', signal: ctl.signal }).finally(() => clearTimeout(t));
+    if (!r.ok) return null;
+    const j = await r.json();
+    return j && j.ok && j.for === body.action ? j : null;
+  } catch (e) { return null; }
+}
+async function api(body, tries) {
+  if (body.token === DEMO_TOKEN || (isDemo() && /^jr_(me|note|logout|access|profile|profile_update|delete_account|rhythm)$/.test(body.action))) return demoApi(body);
+  const quick = await fastJr(body); if (quick) return quick;
+  if (/^jr_(note|profile_update|delete_account)$/.test(body.action) && !body.rid) body = Object.assign({ rid: Date.now().toString(36) + Math.random().toString(36).slice(2, 10) }, body);
+  const n = tries || 3, q = JSON.stringify(body);
+  for (let i = 0; i < n; i++) {
+    try {
+      // A new photo is far too big for a GET address: profile saves always POST (`rid` makes a retry replay, never re-save).
+      const usePost = (body.action === 'jr_note' && q.length > 1500 && i === 0) || body.action === 'jr_profile_update';
+      const once = async () => {
+        const r = usePost ? await fetch(API, { method: 'POST', body: q })
+                          : await fetch(API + '?action=jr&p=' + encodeURIComponent(q) + '&t=' + Date.now());
+        const j = await r.json();
+        if (j && j.for === body.action) return j;
+        throw new Error('stray reply');
+      };
+      // Google sometimes stalls one request for 15–60 s while the next one answers in 2 s. For safe-to-repeat
+      // calls, a second copy goes out after a few seconds and the first answer wins. (A code check is safe:
+      // the server keeps a right answer for 10 minutes and a twin waits for the first.)
+      const hedge = HEDGE_MS[body.action];
+      return hedge && !usePost ? await firstOf(once, hedge) : await once();
+    } catch (e) {
+      if (i + 1 >= n) return { ok: false, error: 'We couldn’t reach the server — please check your connection and try again.' };
+      await new Promise(r => setTimeout(r, 1000 + i * 1500));
+    }
+  }
+}
+const HEDGE_MS = { jr_config: 6000, jr_me: 9000, jr_access: 8000, jr_profile: 8000, jr_rhythm: 9000, jr_phone_verify: 8000 };
+// Run fn now and again after `ms` if nothing has come back; resolve with the first success.
+function firstOf(fn, ms) {
+  return new Promise((res, rej) => {
+    let left = 0, done = false, t = null;
+    const go = () => { left++; fn().then(v => { if (!done) { done = true; clearTimeout(t); res(v); } }, e => { if (--left === 0 && !done) { done = true; clearTimeout(t); rej(e); } }); };
+    go();
+    t = setTimeout(() => { t = -1; if (!done) go(); }, ms);
+  });
+}
+// First call after a quiet spell can take a while (the server is waking up) — say so.
+function slowNote(el, msg) { return setTimeout(() => { const a = document.querySelector(el); if (a && /Loading|Gathering|Getting everything/.test(a.innerText)) a.innerHTML = '<div class="loading">' + msg + '</div>'; }, 6000); }
+function fmtDate(iso, opts) { if (!iso) return ''; const d = new Date(String(iso).length === 10 ? iso + 'T12:00:00' : iso); return isNaN(d) ? '' : d.toLocaleDateString('en-US', opts || { month: 'short', year: 'numeric' }); }
+function fmtPhone(v) { const d = phoneDigits(v).slice(0, 10); if (d.length < 4) return d; if (d.length < 7) return '(' + d.slice(0, 3) + ') ' + d.slice(3); return '(' + d.slice(0, 3) + ') ' + d.slice(3, 6) + '-' + d.slice(6); }
+
+// ── sign-in screens ──────────────────────────────────────────────────────────
+function viewSignin(msg) {
+  noTabs();
+  $('topR').innerHTML = EMBED ? '' : '<a class="btn g sm" href="/">Dashboard</a>'; $('banner').innerHTML = '';
+  if (!S.cfg) { S.cfg = cfgCached(); if (!S.cfg) { $('app').innerHTML = '<div class="loading">Loading…</div>'; api({ action: 'jr_config' }).then(c => { cfgSave(c); S.cfg = c || {}; viewSignin(msg); }); return; } }
+  const c = S.cfg || {};
+  // No passwords: they type their phone number; the code comes by text (if texting is set up)
+  // or to the email on their Living Stones profile (a one-tap link + a code).
+  $('app').innerHTML = '<div class="signin"><img class="mark" src="/assets/ls-logo-white.png" alt="">' +
+    '<h1 class="b-h">You belong<br>to <em>Jesus.</em></h1><p>' + (c.channel === 'sms' ? 'Enter your phone number. We’ll text you a sign&#8209;in code.' : 'Enter your phone number. We’ll email you a sign-in link.') + '</p>' +
+    '<input class="field" id="ph" type="tel" inputmode="tel" autocomplete="tel" placeholder="Your mobile number" oninput="this.value=fmtPhone(this.value)" onkeydown="if(event.key===\'Enter\')sendCode()">' +
+    '<button class="btn p" id="sendBtn" onclick="sendCode()">' + (c.channel === 'sms' ? 'Send code' : 'Email me a link') + '</button>' +
+    '<div class="err" id="err">' + esc(msg || '') + '</div>' +
+    '<div class="fine">Use the number you’ve given Living Stones.' + (c.channel === 'sms' ? '' : ' The link goes to the email on your Living Stones profile.') +
+    '<br><br><b style="color:var(--muted)">It’s private.</b> Only you, and the pastors who care for you, can see your information. <a href="/privacy/" target="_blank" rel="noopener">Privacy policy</a></div></div>';
+  const ph = $('ph'); if (ph) setTimeout(() => ph.focus(), 50);
+}
+async function sendCode() {
+  const d = phoneDigits(($('ph') || {}).value);
+  if (d.length !== 10) { $('err').textContent = 'Please enter your 10-digit mobile number.'; return; }
+  if (d === DEMO_PHONE) { tokenSet(DEMO_TOKEN); idSet({ name: 'Gary Phillips' }); toast('Demo: signed in as Gary Phillips, a sample member'); return loadMe(); }
+  const b = $('sendBtn'); b.disabled = true; b.textContent = 'Sending…';
+  const r = await api({ action: 'jr_phone_start', phone: d });
+  if (!r.ok) { b.disabled = false; b.textContent = (S.cfg || {}).channel === 'sms' ? 'Send code' : 'Email me a link'; $('err').textContent = r.error || 'Please try again.'; return; }
+  S.phone = d; S.channel = r.channel || (S.cfg || {}).channel; viewCode();
+}
+function viewCode(msg) {
+  noTabs();
+  const d = S.phone;
+  $('app').innerHTML = '<div class="signin"><img class="mark" src="/assets/ls-logo-white.png" alt="">' +
+    (S.channel === 'sms'
+      ? '<h1 style="font-size:26px">Check your texts</h1><p>If ' + esc(fmtPhone(d)) + ' is the number Living Stones has for you, a 6-digit code is on its way.</p>'
+      : '<h1 style="font-size:26px">Check your email</h1><p>If ' + esc(fmtPhone(d)) + ' is the number Living Stones has for you, we just emailed you a sign-in link. ' + (appStandalone() ? '<b style="color:var(--text)">Type the 6-digit code from that email here</b> (the button in the email opens your web browser instead of this app).</p>' : '<b style="color:var(--text)">Tap the button</b> in that email — or type the 6-digit code here.</p>')) +
+    '<input class="field code" id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="······" oninput="this.value=this.value.replace(/\\D/g,\'\');if(this.value.length===6)checkCode()">' +
+    '<button class="btn p" id="codeBtn" onclick="checkCode()">Sign in</button>' +
+    '<div class="err" id="err">' + esc(msg || '') + '</div>' +
+    '<div class="fine"><a href="#" onclick="sendAgain();return false">Send it again</a> · <a href="#" onclick="viewSignin();return false">Use a different number</a><br>' +
+    (S.channel === 'sms' ? '' : 'Don’t see it? Check your spam or promotions folder. ') + 'You’ll stay signed in on this device for 90 days.</div></div>';
+  setTimeout(() => { const c = $('code'); if (c) c.focus(); }, 50);
+}
+async function sendAgain() { await api({ action: 'jr_phone_start', phone: S.phone }); toast('Sent again'); }
+async function checkCode() {
+  const code = ($('code') || {}).value || '', b = $('codeBtn');
+  if (code.length < 4 || !b || b.disabled) return;   // the 6th digit already sent it (autofill can fire twice)
+  b.disabled = true; b.textContent = 'Checking…';
+  const r = await api({ action: 'jr_phone_verify', phone: S.phone, code: code });
+  if (r.ok && r.token) { tokenSet(r.token); idSet({ p4: S.phone.slice(-4) }); return loadMe(); }
+  if (r.ok && r.pick) { S.ticket = r.ticket; return viewPick(r.pick); }
+  if (b.isConnected === false) return;
+  b.disabled = false; b.textContent = 'Sign in'; const er = $('err'); if (er) er.textContent = r.error || 'Please try again.';
+}
+function viewPick(list) {
+  noTabs();
+  $('app').innerHTML = '<div class="signin"><img class="mark" src="/assets/ls-logo-white.png" alt="">' +
+    '<h1 style="font-size:26px">Who’s signing in?</h1><p>A few people share this number. Pick your name.</p><div class="pick">' +
+    list.map(p => '<button class="btn" onclick="pick(\'' + esc(p.pid) + '\')">' + esc(p.name) + '</button>').join('') + '</div><div class="err" id="err"></div></div>';
+}
+async function pick(pid) {
+  const r = await api({ action: 'jr_pick', ticket: S.ticket, pid: pid });
+  if (r.ok && r.token) { tokenSet(r.token); idSet({ p4: (S.phone || '').slice(-4) }); return loadMe(); }
+  $('err').textContent = r.error || 'Please try again.';
+}
+async function pcoSignin() {
+  const r = await api({ action: 'jr_oauth_start' });
+  if (r.ok && r.url) location.href = r.url; else viewSignin(r.error);
+}
+
+// ── the journey ──────────────────────────────────────────────────────────────
+// ── speed: show the last good page instantly (this device only, tied to this sign-in), refresh quietly ──
+const ME_CACHE = 'lssr_me_cache', CFG_CACHE = 'lssr_jr_cfg', RHY_CACHE = 'lssr_rhythm_cache';
+function tokKey() { const t = tokenGet(); return t ? t.slice(-16) : ''; }
+function meCacheGet() { try { const c = JSON.parse(localStorage.getItem(ME_CACHE) || 'null'); return c && tokKey() && c.tok === tokKey() ? c.data : null; } catch (e) { return null; } }
+function meCacheSet(d) { try { localStorage.setItem(ME_CACHE, JSON.stringify({ tok: tokKey(), at: Date.now(), data: d })); } catch (e) {} }
+function meCacheClear() { try { localStorage.removeItem(ME_CACHE); localStorage.removeItem(RHY_CACHE); } catch (e) {} }
+function cfgSave(c) { try { if (c && c.ok) localStorage.setItem(CFG_CACHE, JSON.stringify(c)); } catch (e) {} }
+function cfgCached() { try { return JSON.parse(localStorage.getItem(CFG_CACHE) || 'null'); } catch (e) { return null; } }
+const sameMe = (a, b) => { const k = x => JSON.stringify(Object.assign({}, x, { asOf: 0, for: 0 })); return !!a && !!b && k(a) === k(b); };
+async function loadMe(fresh) {
+  const cached = !S.preview && !S.data && meCacheGet();
+  if (cached) { S.data = cached; viewJourney(); }                     // instant
+  else if (!S.data) { noTabs(); $('app').innerHTML = '<div class="loading">Getting everything ready…</div>'; }
+  const slow = S.data ? 0 : slowNote('#app', 'Getting everything ready… the first load can take a few extra seconds.');
+  const body = S.preview ? { action: 'jr_me', preview: S.preview, pw: S.pw } : Object.assign({ action: 'jr_me', token: tokenGet() }, fresh === true ? { fresh: 1 } : {});
+  const r = await api(body, 3);
+  clearTimeout(slow);
+  if (r.ok && r.person) {                                             // only ever draw a real person's page
+    const changed = !sameMe(r, S.data); S.data = r; if (!S.preview) { meCacheSet(r); if (r.person && r.person.name) idSet({ name: r.person.name }); }
+    if (changed || !S.rendered) viewJourney();                         // re-render keeps your scroll position
+    return;
+  }
+  if (r.signin) { meCacheClear(); tokenSet(''); S.data = null; S.rendered = false; return viewSignin(); }
+  if (S.rendered) return;                                             // offline/slow: keep showing the last good page
+  $('app').innerHTML = '<div class="loading">' + esc(r.error || 'We couldn’t load your page.') + '<br><br><button class="btn" onclick="loadMe()">Try again</button></div>';
+}
+// Back after a while (the installed app stays open in the background): refresh quietly; it redraws only if something changed.
+let _hiddenAt = 0;
+if (typeof document.addEventListener === 'function') document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { _hiddenAt = Date.now(); return; }
+  if (_hiddenAt && Date.now() - _hiddenAt > 30 * 60 * 1000 && S.data && !S.preview && tokenGet()) { _hiddenAt = 0; loadMe(); }
+});
+const SEASONS = [
+  ['exploring', 'Exploring', 'Finding your way to Jesus and this church'],
+  ['belonging', 'Belonging', 'Baptized, a Family Member, Sunday is home'],
+  ['growing', 'Growing', 'Growing with others in a group and on a team'],
+  ['leading', 'Leading', 'Helping others take their next step'],
+  ['sending', 'Sending', 'Living on mission in South Reno and beyond']
+];
+const SEASON_WORD = { exploring: 'an Exploring', belonging: 'a Belonging', growing: 'a Growing', leading: 'a Leading', sending: 'a Sending' };
+const ICONS = {
+  group: '<circle cx="9" cy="8" r="3"/><circle cx="16" cy="9" r="2.5"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5M14 15.5c3 0 7 1.5 7 4.5"/>',
+  serve: '<path d="M12 21s-7-4.5-7-10a4 4 0 017-2.6A4 4 0 0119 11c0 5.5-7 10-7 10z"/>',
+  baptism: '<path d="M12 3c3 4 6 7.5 6 11a6 6 0 01-12 0c0-3.5 3-7 6-11z"/>',
+  membership: '<path d="M3 11l9-7 9 7M5 10v10h14V10"/>',
+  lead: '<path d="M12 3l2.5 5 5.5.8-4 3.9.9 5.5L12 15.7 7.1 18.2 8 12.7 4 8.8 9.5 8z"/>',
+  give: '<path d="M20 12v9H4v-9M2 7h20v5H2zM12 21V7M12 7c-2-4-6-3-6-1s4 1 6 1c2 0 6 1 6-1s-4-3-6 1z"/>',
+  share: '<path d="M21 3L10 14M21 3l-6.5 18-4-8-8-4z"/>',
+  invite: '<path d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7M16 6l-4-4-4 4M12 2v13"/>',
+  celebrate: '<path d="M20 6L9 17l-5-5"/>'
+};
+function stepIcon(id) { const k = /group/.test(id) ? 'group' : /serve/.test(id) ? 'serve' : /baptism-on/.test(id) ? 'celebrate' : /baptism/.test(id) ? 'baptism' : /member/.test(id) ? 'membership' : /lead/.test(id) ? 'lead' : /give/.test(id) ? 'give' : 'invite'; return '<svg viewBox="0 0 24 24">' + ICONS[k] + '</svg>'; }
+function dismissed() { try { return JSON.parse(localStorage.getItem(DISMISS_KEY) || '{}'); } catch (e) { return {}; } }
+function dismiss(id) { const d = dismissed(); d[id] = Date.now() + 60 * 864e5; try { localStorage.setItem(DISMISS_KEY, JSON.stringify(d)); } catch (e) {} viewJourney(); toast('Okay — we’ll keep that for another season.'); }
+
+// ── the app: Home · Events · Connect · Give · Me ────────────────────────────
+// Everyone signs in (phone + texted code). Church Center still does the transactions (giving,
+// registrations, sign-ups, check-in); every button here lands on the exact Church Center page.
+const TAB_ICONS = {
+  home: '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h5v-6h4v6h5V10"/>',
+  events: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  connect: '<circle cx="9" cy="8" r="3"/><circle cx="16" cy="9" r="2.5"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5M14 15.5c3 0 7 1.5 7 4.5"/>',
+  give: '<path d="M20 12v9H4v-9M2 7h20v5H2zM12 21V7M12 7c-2-4-6-3-6-1s4 1 6 1c2 0 6 1 6-1s-4-3-6 1z"/>',
+  me: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>'
+};
+const TABS = [['home', 'Home'], ['events', 'Events'], ['connect', 'Groups'], ['give', 'Give'], ['me', 'Me']];
+const CC = 'https://lssr.churchcenter.com';
+// A group meeting's Church Center page is /groups/events/<id>. Saved copies from before Oct 20 2026 carry
+// <group page>/events/<id>, which is Church Center's "strayed off course" page — rewrite those.
+// A leader's meeting in Church Center: /my/groups/<group>/events/<meeting>/attendance is the Take-attendance screen.
+// Older answers (Apps Script fallback, old caches) carry only the meeting id → its read-only page /groups/events/<id>.
+function ccMeetingUrl(m) {
+  const u = String((m && m.url) || ''), ev = (/\/events\/(\d+)\/?$/.exec(u) || [])[1];
+  if (/\/my\/groups\/\d+\/events\/\d+$/.test(u)) return u + '/attendance';
+  if (ev && m.gid) return CC + '/my/groups/' + m.gid + '/events/' + ev + '/attendance';
+  return ev ? CC + '/groups/events/' + ev : u;
+}
+function ccLinks() { const L = (S.data && S.data.links) || {}; return {
+  giving: L.giving || CC + '/giving', groups: L.groups || CC + '/groups', serve: L.serve || CC + '/groups/serve-teams',
+  baptism: L.baptism || CC + '/people/forms/764941', membership: L.membership || '', me: L.churchCenter || CC + '/me',
+  checkins: CC + '/check-ins', calendar: CC + '/calendar', registrations: CC + '/registrations/events' }; }
+function curTab() { const h = (location.hash || '').replace(/^#/, '').split('/')[0]; return h === 'visit' || TABS.some(x => x[0] === h) ? h : 'home'; }
+// A calm home, and one simple page per area (Events · Groups & teams · Give · Me). Back = ‹ Home.
+function go(tab) {
+  if (tab === 'visit') S.shareView = '';
+  if (EMBED) { if (!tab || tab === 'home') closePane(); else openPane(tab); return; }   // inside the Me page: a popup, never a new page
+  const h = tab && tab !== 'home' ? '#' + tab : '';
+  if ((location.hash || '') !== h) history.pushState(null, '', location.pathname + location.search + h);
+  viewJourney(); window.scrollTo(0, 0);
+}
+window.addEventListener('popstate', () => { if (S.data) viewJourney(); });
+// A bare "#" link never navigates (it would scroll the page to the top)
+document.addEventListener('click', e => { const a = e.target && e.target.closest && e.target.closest('a[href="#"]'); if (a) e.preventDefault(); });
+function tabsHtml() { const cur = curTab(); return TABS.map(x => '<button class="' + (x[0] === cur ? 'on' : '') + '" onclick="go(\'' + x[0] + '\')"' + (x[0] === cur ? ' aria-current="page"' : '') + '><svg viewBox="0 0 24 24">' + TAB_ICONS[x[0]] + '</svg><span>' + x[1] + '</span></button>').join(''); }
+function noTabs() { closePane(); $('ttabs').innerHTML = ''; $('tabbar').innerHTML = ''; document.body.classList.remove('app-in'); if (EMBED && !S.preview) { try { parent.postMessage({ jrSignedIn: false }, location.origin); } catch (e) {} } }
+const ext = (href, label, cls) => '<a class="' + (cls || 'btn') + '" href="' + esc(href) + '" target="_blank" rel="noopener">' + label + '</a>';
+const chev = '<svg class="chv" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>';
+function linkRow(href, icon, title, sub, onclick) {
+  return '<a class="lrow" ' + (onclick ? 'href="#" onclick="' + onclick + ';return false"' : 'href="' + esc(href) + '" target="_blank" rel="noopener"') + '><span class="li"><svg viewBox="0 0 24 24">' + icon + '</svg></span><span class="lt"><b>' + title + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</span>' + chev + '</a>';
+}
+
+// Our words for the steps (the server's wording can lag behind): membership is "fully belong", for now.
+const STEP_TITLES = { membership: 'It’s time to fully belong at Living Stones', invite: 'Share what Jesus has done for you' };
+function viewJourney() {
+  (S.data && S.data.steps || []).forEach(x => { if (STEP_TITLES[x.id]) x.title = STEP_TITLES[x.id]; });
+  const d = S.data, p = d.person || {}, first = (p.first || '').split(' ')[0]; tellParent();
+  // Share (standalone page, formerly Plan a visit) has no tab row of its own: the main menu already has it; ‹ Home is the way back
+  const noRow = curTab() === 'visit';
+  $('ttabs').innerHTML = noRow ? '' : tabsHtml(); $('tabbar').innerHTML = noRow ? '' : tabsHtml(); document.body.classList.toggle('app-in', !noRow);
+  $('topR').innerHTML = EMBED ? '' : '<a class="btn g sm wide-only" href="/">Dashboard</a>';
+  const sName = (SEASONS.find(x => x[0] === d.season) || [, ''])[1];
+  $('banner').innerHTML = isDemo() && !S.preview ? '<div class="banner">Demo · this is Gary Phillips, a made-up member (baptized, in a group). Nothing here is real, and nothing you do is saved.</div>' : S.preview ? '<div class="banner">Pastor preview of ' + esc(p.name) + '’s app · buttons that send or save are turned off' +
+    (d.seasonWhy && d.seasonWhy.length ? '<div class="why"><b>Why ' + esc(sName) + ' (pastors only):</b> ' + d.seasonWhy.map(esc).join(' · ') + '</div>' : '') + '</div>' : '';
+  let tab = curTab(); const sub = (location.hash || '').split('/')[1], pend = EMBED && tab !== 'home' ? tab : '';
+  if (pend) tab = 'home';
+  const y = window.scrollY, same = S.rendered && S.lastTab === tab, appEl = $('app');
+  // Swapping the page's contents makes it momentarily shorter; the browser then clamps the scroll position
+  // (usually to the top) and a later scrollTo can't bring it back. Hold the old height until things settle.
+  if (same) { appEl.style.minHeight = appEl.offsetHeight + 'px'; holdRelease(); }
+  const page = tab === 'events' ? viewEvents(d) : tab === 'connect' ? viewConnect(d) : tab === 'give' ? viewGive(d) : tab === 'me' ? viewMe(d) : tab === 'visit' ? viewVisit(d) : '';
+  $('app').innerHTML = tab === 'home' ? '<div class="wrap one home">' + viewHome(d) + '</div>'
+    : '<div class="wrap one page">' + page + '</div>';
+  S.rendered = true; S.lastTab = tab;
+  if (tab === 'home') { loadForYouImage(); loadNewsCards(d); loadRhythm(); loadServeOpen(); }
+  if (tab === 'events') loadEvents(d);
+  if (tab === 'connect') loadFind();
+  if (tab === 'me') { appCard(); const now_ = document.querySelector('.stop.now'); if (now_ && now_.parentElement.scrollWidth > now_.parentElement.clientWidth) now_.parentElement.scrollLeft = now_.offsetLeft - now_.parentElement.clientWidth / 2 + now_.offsetWidth / 2; }
+  if (same) window.scrollTo(0, y);                                    // quiet refreshes keep your place (the held height makes it stick)
+  if (pend) { history.replaceState(null, '', location.pathname + location.search); openPane(pend); }
+  if (sub === 'prayer' || sub === 'note' || sub === 'profile') { history.replaceState(null, '', location.pathname + location.search + (tab === 'home' ? '' : '#' + tab)); setTimeout(() => openSheet(sub), 250); }
+}
+
+// Lets go of the held height once late-arriving pieces (images, news cards, rhythm) have had time to fill in,
+// or as soon as a finger touches the page, whichever comes first.
+let _holdT = 0;
+function holdRelease() {
+  clearTimeout(_holdT);
+  const free = () => { clearTimeout(_holdT); document.removeEventListener('touchstart', free, true); document.removeEventListener('wheel', free, true); const a = $('app'); if (a) a.style.minHeight = ''; };
+  document.addEventListener('touchstart', free, { capture: true, once: true, passive: true });
+  document.addEventListener('wheel', free, { capture: true, once: true, passive: true });
+  _holdT = setTimeout(free, 2500);
+}
+
+// Groups · Give · Events · Me · Share open as a popup over the page you're on (no second menu, no leaving).
+function openPane(tab) {
+  const d = S.data; if (!d) return;
+  const page = tab === 'events' ? viewEvents(d) : tab === 'connect' ? viewConnect(d) : tab === 'give' ? viewGive(d) : tab === 'me' ? viewMe(d) : tab === 'visit' ? viewVisit(d) : '';
+  if (!page) return;
+  $('paneBody').innerHTML = '<div class="wrap one page">' + page.replace(/<a href="#" onclick="go\('home'\);return false"[^>]*>[^<]*<\/a>/, '') + '</div>';
+  $('pane').setAttribute('aria-label', ({ events: 'Events', connect: 'Groups', give: 'Give', me: 'Me', visit: 'Share' })[tab] || 'Details');
+  S.pane = tab; $('paneOv').classList.add('open'); $('pane').scrollTop = 0;
+  if (tab === 'events') loadEvents(d);
+  if (tab === 'connect') loadFind();
+  if (tab === 'me') appCard();
+  try { $('paneX').focus({ preventScroll: true }); } catch (e) {}
+}
+function closePane() { S.pane = ''; const o = $('paneOv'); if (o) o.classList.remove('open'); }
+function paneOpen() { const o = $('paneOv'); return !!(o && o.classList.contains('open')); }
+
+// ── Home: persistent encouragement, For you, This Sunday, coming up, news ─────────
+function stepsHtml(d) {
+  const dm = dismissed(), now = Date.now();
+  const steps = (d.steps || []).filter(s => s.kind === 'celebrate' || !(dm[s.id] > now));
+  return { steps, html: steps.length ? steps.map(s => '<div class="step' + (s.kind === 'celebrate' ? ' celebrate' : '') + '" data-sid="' + esc(s.id) + '"><div class="ic">' + stepIcon(s.id) + '</div><div><b>' + esc(s.title) + '</b><p>' + esc(s.why) + '</p>' +
+      (s.btn ? '<div class="acts">' +
+        (s.url ? '<a class="btn p sm" href="' + esc(s.url) + '" target="_blank" rel="noopener">' + esc(s.btn) + '</a>'
+               : '<button class="btn p sm" onclick="openSheet(\'note\',' + JSON.stringify(String(s.action || '').replace(/^note:/, '')).replace(/"/g, '&quot;') + ')">' + esc(s.btn) + '</button>') +
+        '<button class="btn g sm" onclick="dismiss(\'' + esc(s.id) + '\')">Not right now</button></div>' : '') +
+      '</div></div>').join('')
+    : '<div class="dim">You’re all caught up. There’s nothing more to do here today.</div>' };
+}
+// ── "You belong to Jesus." — our core belief, the first thing anyone sees ─────────
+const BELONG_VERSES = [   // short paraphrases (no quotation marks), one per day
+  ['Called by name; you are mine.', 'Isaiah 43:1'],
+  ['Members of God’s household.', 'Ephesians 2:19'],
+  ['Living stones, being built into a spiritual house.', '1 Peter 2:5'],
+  ['Nothing can separate us from God’s love in Christ.', 'Romans 8:39'],
+  ['You are Christ’s.', '1 Corinthians 3:23'],
+  ['See the Father’s love: we are called God’s children.', '1 John 3:1'],
+  ['One body in Christ, belonging to one another.', 'Romans 12:5'],
+  ['Whoever comes to me, I will never turn away.', 'John 6:37'],
+  ['Whether we live or die, we belong to the Lord.', 'Romans 14:8']
+];
+function dailyVerse() { const d = new Date(), n = Math.floor((d - new Date(d.getFullYear(), 0, 0)) / 864e5); return BELONG_VERSES[n % BELONG_VERSES.length]; }
+function belongHero() {
+  const v = dailyVerse();
+  return '<section class="belong"><h1 class="b-h">You belong<br>to <em>Jesus.</em></h1>' +
+    '<p class="b-v">' + esc(v[0]) + '<span>' + esc(v[1]) + '</span></p></section>';
+}
+// Then one quiet personal card: greeting, a single thank-you, small step icons (invitations, not a score).
+function gratitudeLine(d) {
+  const sv = d.serving || {}, g = d.giving || {}, p = d.person || {}, now = new Date();
+  for (const m of (d.milestones || [])) {
+    if (!/baptiz/i.test(m.label || '') || !m.date) continue;
+    const b = new Date(String(m.date).length === 10 ? m.date + 'T12:00:00' : m.date), ann = new Date(now.getFullYear(), b.getMonth(), b.getDate()), days = Math.round((ann - now) / 864e5);
+    if (days >= -14 && days <= 14 && now.getFullYear() > b.getFullYear()) { const n = now.getFullYear() - b.getFullYear(); return n + (n === 1 ? ' year' : ' years') + ' since your baptism. A day worth remembering.'; }
+  }
+  const lead = (d.groups || []).find(x => x.leader); if (lead) return 'Thank you for leading ' + esc(lead.name) + '.';
+  const team = ((sv.teams || [])[0] || {}).name;
+  if (team) return 'Thank you for serving on ' + (/\bteam$/i.test(team) ? 'the ' + esc(team) : 'the ' + esc(team) + ' team') + '.';
+  if ((d.groups || []).length) return 'Glad you’re doing life with ' + esc(d.groups[0].name) + '.';
+  if (g.any) return 'Thank you for your generosity.';
+  const yrs = p.since ? Math.floor((Date.now() - new Date(p.since)) / 3156e7) : 0;
+  return yrs >= 1 ? yrs + (yrs === 1 ? ' year' : ' years') + ' at Living Stones. We’re glad you’re here.' : 'We’re so glad you’re here.';
+}
+function greetHtml(d) {
+  const p = d.person || {}, first = (p.first || '').split(' ')[0];
+  return '<section class="card me-card"><div class="mc-top">' + (p.avatar ? '<img class="b-av" src="' + esc(p.avatar) + '" alt="">' : '<span class="b-av">' + esc((first || '?').charAt(0)) + '</span>') +
+    '<div><b>' + greeting() + ', ' + esc(first) + '</b><p>' + gratitudeLine(d) + '</p></div></div>' +
+    '<div class="b-k">Ways to grow</div>' + badgesHtml(d) + '</section>';
+}
+// ── Plan a visit: a ready-to-send invitation with everything a guest needs for Sunday ──────────────
+const VISIT = {
+  times: ['8:00 AM', '9:30 AM', '11:00 AM'],
+  place: 'Living Stones South Reno', addr: '95 Foothill Drive, Reno, NV 89521',
+  map: 'https://maps.google.com/?q=' + encodeURIComponent('95 Foothill Drive, Reno, NV 89521'),
+  web: 'https://lssouthreno.com'
+};
+function nextSunday() { const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + ((7 - d.getDay()) % 7)); return d; }
+function visitText(friend, when, time, mine) {
+  const sun = nextSunday(), day = sun.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+  return (friend ? 'Hey ' + friend + '! ' : 'Hey! ') + 'I’d love for you to visit Living Stones South Reno with me' + (when === 'next' ? ' this Sunday (' + day + ')' : '') + (time ? ' at ' + time : '') + '. ' +
+    'We meet at ' + VISIT.addr + ' — gatherings are at ' + VISIT.times.join(', ').replace(/, ([^,]*)$/, ', or $1') + '.\n\n' +
+    'What to expect: it’s pretty relaxed. About an hour of great live music and a message from the Bible, and a lot of friendly people who’ll be glad you came. Wear whatever you’re comfortable in, and there’s zero pressure. Just come and see.\n\n' +
+    'Kids are welcome! Our kids ministry has a safe check-in at the Kids desk when you arrive, and I’ll show you where to go.\n\n' +
+    'I’ll save you a seat' + (mine ? ' — meet me at the front doors' : '') + '. More info: ' + VISIT.web;
+}
+function viewInvite(d) {
+  const first = ((d.person || {}).first || '').split(' ')[0];
+  setTimeout(visitUpdate, 0);
+  return shareHead('Invite a Friend', 'Invite someone to a Sunday gathering. We wrote the invitation for you — add their name, tweak it if you like, and send it as a text.', true) +
+    '<div class="card"><div class="card-h"><h3>Sunday at a glance</h3></div>' +
+    '<div class="rows">' +
+      '<div class="r"><b>When</b><span>Sundays · ' + VISIT.times.join(' · ') + '</span></div>' +
+      '<div class="r"><b>Where</b><span>' + esc(VISIT.place) + '<br>' + esc(VISIT.addr) + '</span></div>' +
+      '<div class="r"><b>What to expect</b><span>It’s pretty relaxed. About an hour of live music and a message from the Bible, with friendly people who’ll be glad you came. Wear what’s comfortable. No pressure, just come and see.</span></div>' +
+      '<div class="r"><b>Kids</b><span>Kids are welcome — check in at the Kids desk when you arrive.</span></div>' +
+    '</div><div style="margin-top:12px">' + ext(VISIT.map, 'Open in Maps', 'btn') + '</div></div>' +
+    '<div class="card" style="margin-top:16px"><div class="card-h"><h3>Your invitation</h3></div>' +
+      '<label class="dim" style="font-size:13px">Who are you inviting? (optional)</label>' +
+      '<input class="field" id="vzName" placeholder="Their first name" oninput="visitUpdate()" style="width:100%;margin:6px 0 10px">' +
+      '<label class="dim" style="font-size:13px">Their phone number (optional — opens a text to them)</label>' +
+      '<input class="field" id="vzPhone" type="tel" inputmode="tel" placeholder="(775) 555-0123" oninput="visitUpdate()" style="width:100%;margin:6px 0 10px">' +
+      '<div class="chips" style="margin-bottom:10px">' + ['This Sunday', 'Any Sunday'].map((l, i) => '<button class="' + (i ? '' : 'on') + '" data-w="' + (i ? 'any' : 'next') + '" onclick="visitWhen(this)">' + l + '</button>').join('') +
+        VISIT.times.map(t => '<button data-t="' + t + '" onclick="visitTime(this)">' + t + '</button>').join('') + '</div>' +
+      '<textarea id="vzText" style="width:100%;min-height:260px;font:inherit;font-size:14.5px;line-height:1.5" oninput="S.vzEdited=true"></textarea>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><a class="btn p big" id="vzSms" href="#">Send as a text</a>' +
+      '<button class="btn" onclick="visitShare()">Share…</button><button class="btn" onclick="visitCopy()">Copy</button></div>' +
+      '<div class="quiet" style="margin:12px 0 0;font-size:12px">This opens your Messages app with the invitation ready to go — nothing is sent until you tap Send there.</div></div>';
+}
+function visitWhen(b) { S.vzWhen = b.dataset.w; document.querySelectorAll('.chips button[data-w]').forEach(x => x.classList.toggle('on', x === b)); S.vzEdited = false; visitUpdate(); }
+function visitTime(b) { S.vzTime = S.vzTime === b.dataset.t ? '' : b.dataset.t; document.querySelectorAll('.chips button[data-t]').forEach(x => x.classList.toggle('on', x.dataset.t === S.vzTime)); S.vzEdited = false; visitUpdate(); }
+function visitUpdate() {
+  const t = $('vzText'); if (!t) return;
+  const friend = ($('vzName') || {}).value || '';
+  if (S.vzEdited && !t.value) t.value = S.vzSaved || '';
+  if (!S.vzEdited) t.value = visitText(friend.trim().split(' ')[0], S.vzWhen || 'next', S.vzTime || '', true);
+  const ph = (($('vzPhone') || {}).value || '').replace(/[^\d+]/g, '');
+  $('vzSms').href = 'sms:' + ph + '?&body=' + encodeURIComponent(t.value);
+  t.oninput = () => { S.vzEdited = true; S.vzSaved = t.value; $('vzSms').href = 'sms:' + ph + '?&body=' + encodeURIComponent(t.value); };
+}
+function visitShare() {
+  const text = ($('vzText') || {}).value || '';
+  if (navigator.share) navigator.share({ text }).catch(() => {}); else visitCopy();
+}
+function visitCopy() {
+  const t = $('vzText'); if (!t) return;
+  (navigator.clipboard ? navigator.clipboard.writeText(t.value) : Promise.reject()).then(() => toast('Copied'), () => { t.select(); document.execCommand('copy'); toast('Copied'); });
+}
+
+// ── Share: one page, three ways to share Jesus (Invite · Your story · Your faith) ──────────────────
+// The tab is still called 'visit' so old links and the main menu keep working. S.shareView: '' (the three options) | invite | story | faith.
+const SHARE_KEY = 'lssr_journey_story';
+const SHARE_PARTS = [
+  ['before', 'What was your life like before Jesus?', ['What were you chasing, trusting or hoping would fix things?', 'What felt empty, heavy or out of control?', 'How did you see God (or not think about Him at all)?']],
+  ['met', 'How did you meet Jesus, or why did you start believing in Jesus?', ['What happened: a person, a hard season, a question, a moment?', 'What did you come to see about Jesus and what He did for you?', 'What did you do in response?']],
+  ['now', 'What does your life look like differently now because of the gospel?', ['What has changed in how you handle worry, failure, money, relationships?', 'Where do you still need Jesus every day?', 'What would you say to someone in the place you used to be?']]
+];
+const SHARE_EXAMPLES = [
+  ['“I had it all together”', 'Before: I was the person who always had a plan. I worked hard, kept everyone happy and figured that if I did enough good things, God and everyone else would be pleased with me. Underneath, I was exhausted and afraid of being found out. Meeting Jesus: A coworker invited me to a group, and I heard that Jesus didn’t ask me to earn anything. He did it for me on the cross, and I could just receive it. I’d never heard that. I trusted Him that year. Now: I still work hard, but I’m not trying to earn love anymore. I can fail and not fall apart, and I’m kinder to the people around me.'],
+  ['“Running from everything”', 'Before: For about ten years I numbed everything with partying and staying busy. I had friends, but nobody really knew me, and I woke up lonely most mornings. Meeting Jesus: When my life hit bottom, my sister kept showing up without lecturing me. She told me Jesus loves people who are a mess, and I thought, that’s me. I started reading about Him and asked Him to take over. Now: I’m not perfect, but I’m not running anymore. I have real friends, I’m honest about my struggles, and I have a hope I never had.'],
+  ['“Church kid, empty faith”', 'Before: I grew up going to church every week, so I figured I was fine. But Jesus was more of a family tradition than someone I knew. In college I drifted and didn’t miss Him. Meeting Jesus: A friend asked me a simple question: “What do you think Jesus has done for you?” I didn’t have an answer. That sent me back to the Bible, and for the first time I saw I needed a Savior, not just a good example. Now: Faith feels personal, not inherited. I pray about real things, I forgive faster, and I’m learning to talk about Jesus without feeling awkward.']
+];
+const SHARE_GOSPEL = [
+  ['God made everything good', 'God created the world and the people in it to know Him and live with Him, trusting and enjoying Him. We were made to be loved by God and to love Him and each other.'],
+  ['We turned away', 'We chose our own way instead of God’s. That’s sin, and it breaks everything: our relationship with God, with each other and with creation. We can’t fix it ourselves, and sin leads to death and separation from God.'],
+  ['Jesus rescued us', 'God sent His Son. Jesus lived the perfect life we haven’t, died on the cross in our place to take the punishment for sin, and rose from the dead, defeating sin and death. In Him we are forgiven and made right with God.'],
+  ['Jesus makes all things new, and we respond', 'God is restoring all things, and one day He will make everything new. Right now He invites everyone to turn from sin and self and trust Jesus. When we do, we’re forgiven, adopted into God’s family, and we begin a new life with Him.']
+];
+const SHARE_RES = [
+  ['Books', [
+    ['The Unbelievable Gospel — Jonathan K. Dodson', 'https://www.amazon.com/s?k=The+Unbelievable+Gospel+Jonathan+Dodson', 'Recommended read: how to share the gospel with friends who find it hard to believe.'],
+    ['Gospel Fluency — Jeff Vanderstelt', 'https://www.crossway.org/books/gospel-fluency-case/', 'Learn to speak the truths of Jesus naturally into everyday conversations.'],
+    ['What Is the Gospel? — Greg Gilbert', 'https://www.9marks.org/books/what-is-the-gospel/', 'A short, clear explanation of the gospel: God, man, Christ, and our response.'],
+    ['What Is the Gospel? Study Guide — 9Marks', 'https://www.9marks.org/books/what-is-the-gospel-study-guide/', 'For going deeper with a friend or small group.']
+  ]],
+  ['Videos', [
+    ['Five Thresholds of Evangelism', 'https://vimeo.com/98177104', 'Start here. A friend’s journey to Jesus usually takes steps. This helps you see where they are and what to do next.'],
+    ['The Story of the Bible — BibleProject', 'https://bibleproject.com/videos/the-story-of-the-bible/', 'A short animated overview of the whole biblical story, from creation to new creation.'],
+    ['Gospel of the Kingdom — BibleProject', 'https://bibleproject.com/videos/gospel-kingdom/', 'What “good news” meant in the Bible and how Jesus announced the kingdom.']
+  ]],
+  ['More to explore', [
+    ['The Gospel in Life — Tim Keller', 'https://gospelinlife.com/', 'Sermons and resources on living out the gospel in everyday life.'],
+    ['Two Ways to Live', 'https://twowaystolive.com/', 'A simple, short way to explain the gospel to a friend.'],
+    ['What is the Gospel? — The Gospel Coalition', 'https://www.thegospelcoalition.org/topics/gospel/', 'Articles and resources on the gospel.'],
+    ['Saturate — Jeff Vanderstelt’s ministry', 'https://www.saturatetheworld.com/', 'Training and resources for making disciples in everyday life.']
+  ]]
+];
+function storyGet() { try { return JSON.parse(localStorage.getItem(SHARE_KEY) || '{}'); } catch (e) { return {}; } }
+function storySave(k, v) { const d = storyGet(); d[k] = v; try { localStorage.setItem(SHARE_KEY, JSON.stringify(d)); } catch (e) {} }
+function shareGo(v) {
+  S.shareView = v || '';
+  if (paneOpen()) openPane('visit'); else { viewJourney(); window.scrollTo(0, 0); }
+}
+function shareHead(title, sub, back) {
+  return '<div class="ph">' + (back ? '<a href="#" onclick="shareGo(\'\');return false" class="dim" style="font-size:13px;text-decoration:none">‹ Share</a>'
+    : '<a href="#" onclick="go(\'home\');return false" class="dim" style="font-size:13px;text-decoration:none">‹ Home</a>') + '<h2>' + title + '</h2><p class="muted">' + sub + '</p></div>';
+}
+function viewVisit(d) {
+  const v = S.shareView || '';
+  if (v === 'invite') return viewInvite(d);
+  if (v === 'story') return viewShareStory(d);
+  if (v === 'faith') return viewShareFaith(d);
+  const opt = (k, ic, t, s) => '<button class="sh-opt" onclick="shareGo(\'' + k + '\')"><div class="ic"><svg viewBox="0 0 24 24">' + ic + '</svg></div><div><b>' + t + '</b><span>' + s + '</span></div></button>';
+  return shareHead('Share', 'Three simple ways to help someone meet Jesus: invite a friend, share your story, share the gospel.', false) +
+    '<div class="card">' +
+      opt('invite', ICONS.invite, 'Invite a Friend', 'Bring a friend, family member or neighbor to church with you. We’ll write the invitation.') +
+      opt('story', '<path d="M4 5a2 2 0 012-2h12v16H6a2 2 0 00-2 2zM4 21V5M8 8h6M8 12h6"/>', 'Share Your Story', 'Put your testimony into words in three simple parts, with a worksheet and examples.') +
+      opt('faith', '<path d="M12 3v18M6 9h12"/>', 'Share the Gospel', 'Understand the gospel and learn a simple way to talk about it, with books and videos.') +
+    '</div>';
+}
+function viewShareStory(d) {
+  const st = storyGet();
+  return shareHead('Share Your Story', 'Your story is what Jesus has done in your life. It’s hard to argue with, and it opens doors to talk about Him.', true) +
+    '<div class="card sh"><div class="card-h"><h3>How it works</h3></div><ol><li>Answer the three questions below, in your own words. Short notes are fine.</li><li>Put them together in order: before, meeting Jesus, now.</li><li>Practice it out loud until it feels natural.</li></ol></div>' +
+    '<div class="card sh" style="margin-top:16px"><div class="card-h"><h3>Your worksheet</h3><span class="c">saved only on this device</span></div>' +
+      SHARE_PARTS.map((q, i) => '<label for="st_' + q[0] + '">' + (i + 1) + '. ' + esc(q[1]) + '<small>' + q[2].map(esc).join('<br>') + '</small></label><textarea id="st_' + q[0] + '" oninput="storySave(\'' + q[0] + '\',this.value)" placeholder="Write a few sentences…">' + esc(st[q[0]] || '') + '</textarea>').join('') +
+      '<div style="margin-top:12px"><button class="btn" onclick="storyCopy()">Copy my story</button></div></div>' +
+    '<div class="card sh" style="margin-top:16px"><div class="card-h"><h3>Tips</h3></div><ul><li>Keep it to about 3 minutes, roughly 400 words.</li><li>Avoid church jargon (“saved,” “born again,” “washed in the blood”). Say what you mean in everyday words.</li><li>Make Jesus the hero, not you. Keep the “before” short.</li><li>Be honest, including the messy parts. Real beats polished.</li><li>End with an open door: “That’s my story. Do you have one like it?”</li></ul></div>' +
+    '<div class="card sh" style="margin-top:16px"><div class="card-h"><h3>Example stories</h3><span class="c">made up, to spark ideas</span></div>' +
+      SHARE_EXAMPLES.map(x => '<div class="ex"><b>' + x[0] + '</b><p>' + esc(x[1]) + '</p></div>').join('') + '</div>';
+}
+function viewShareFaith(d) {
+  return shareHead('Share the Gospel', 'The gospel is the good news about Jesus. Here it is in plain language, and an easy way to walk a friend through it.', true) +
+    '<div class="card sh"><div class="card-h"><h3>What is the gospel?</h3></div>' + SHARE_GOSPEL.map((g, i) => '<p><b style="color:var(--text)">' + (i + 1) + '. ' + esc(g[0]) + '.</b> ' + esc(g[1]) + '</p>').join('') + '</div>' +
+    '<div class="card sh" style="margin-top:16px"><div class="card-h"><h3>How to walk someone through it</h3></div><ol><li><b>Ask a question.</b> “Has anyone ever explained what Christians believe?” or “What do you think about Jesus?”</li><li><b>Tell it in four steps.</b> God made us. We turned away. Jesus rescued us. We respond. Sketch it on a napkin if it helps.</li><li><b>Invite a response.</b> “Does that make sense? Where are you with it?” Leave room, with no pressure.</li><li><b>Stay with them.</b> Offer to read the Gospel of John together, pray, or come to church with them.</li></ol><p>You don’t have to have every answer. “I don’t know, let’s find out together” is a great answer.</p></div>' +
+    '<div class="card sh" style="margin-top:16px"><div class="card-h"><h3>Resources</h3></div>' + SHARE_RES.map(g => '<h4>' + g[0] + '</h4>' + g[1].map(r => ext(r[1], '<b>' + esc(r[0]) + '</b><span>' + esc(r[2]) + '</span>', 'res')).join('')).join('') + '</div>';
+}
+function storyCopy() {
+  const st = storyGet(), txt = SHARE_PARTS.map(q => (st[q[0]] || '').trim()).filter(Boolean).join('\n\n');
+  if (!txt) { toast('Write a few notes first'); return; }
+  (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => toast('Copied'), () => toast('Couldn’t copy. Select the text instead.'));
+}
+
+function viewHome(d) {
+  const p = d.person || {}, first = (p.first || '').split(' ')[0];
+  const dm = dismissed(), now = Date.now();
+  const steps = (d.steps || []).filter(s => s.kind !== 'celebrate' && !(dm[s.id] > now));
+  const i = Math.min(S.stepIdx || 0, Math.max(0, steps.length - 1)), s = steps[i];
+  S.homeStep = s || null;
+  const personal = s ? (first ? esc(first) + ', ' + esc(s.title.charAt(0).toLowerCase() + s.title.slice(1)) : esc(s.title)) : '';
+  const act = !s ? '' : s.id === 'invite' ? '<button class="btn p big" onclick="go(\'visit\')">Share</button>' : s.url ? ext(s.url, esc(s.btn || 'Take this step'), 'btn p big')
+    : '<button class="btn p big" onclick="openSheet(\'note\',' + JSON.stringify(String(s.action || '').replace(/^note:/, '')).replace(/"/g, '&quot;') + ')">' + esc(s.btn || 'Tell me more') + '</button>';
+  const forYou = s
+    ? '<article class="fy"><div class="fy-img" id="fyImg"><svg viewBox="0 0 24 24">' + (ICONS[stepIconKey(s.id)] || ICONS.invite) + '</svg></div>' +
+      '<div class="fy-b"><h2>' + personal + '</h2><p>' + esc(s.why) + '</p>' + act +
+      '<div class="nx"><a href="#" onclick="dismiss(\'' + esc(s.id) + '\');return false">Not right now</a>' +
+      (steps.length > 1 ? '<a href="#" onclick="S.stepIdx=' + ((i + 1) % steps.length) + ';viewJourney();return false">Next idea ›</a>' : '') + '</div></div></article>'
+    : '<article class="fy"><div class="fy-b"><h2>' + (first ? esc(first) + ', you’re all caught up.' : 'You’re all caught up.') + '</h2><p>' + gratitudeLine(d) + '</p></div></article>';
+  return '<header class="band">' +
+      '<div class="band-av">' + (p.avatar ? '<img src="' + esc(p.avatar) + '" alt="">' : esc((first || '?').charAt(0))) + '</div>' +
+      '<div class="band-hi">' + greeting() + ', ' + esc(first) + '</div>' +
+      '<h1 class="band-h">You belong to <em>Jesus.</em></h1>' +
+      badgesHtml(d) + '<div class="band-tip">Tap an icon to see the next step</div><button class="band-help" onclick="helpSheet()">What do these mean?</button>' +
+    '</header>' +
+    '<div class="h-lbl">For You</div>' + forYou +
+    (S.preview ? '' : '<div id="rhyBox">' + rhythmHtml(S.rhythm || rhyCacheGet()) + '</div>') +
+    '<div class="h-lbl">News &amp; Events <a href="#events" onclick="go(\'events\');return false">See all</a></div>' +
+    '<div class="news2" id="news2"><div class="dim">Loading…</div></div>';
+}
+// ── Your rhythm: the weeks you were with your group, and the weeks you served (last 6 months) ──
+// From jr_rhythm — the server answers only for the signed-in person (the token), never for a pid from here.
+function rhyCacheGet() { try { const c = JSON.parse(localStorage.getItem(RHY_CACHE) || 'null'); return c && tokKey() && c.tok === tokKey() ? c.data : null; } catch (e) { return null; } }
+function rhyCacheAt() { try { return (JSON.parse(localStorage.getItem(RHY_CACHE) || 'null') || {}).at || 0; } catch (e) { return 0; } }
+function rhyKey(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function rhyWeeks(r) {   // Sunday-to-Saturday weeks ending with this one
+  const n = r.weeks || 26, t = new Date((r.today || rhyKey(new Date())) + 'T12:00:00');
+  const s = new Date(t); s.setDate(t.getDate() - t.getDay() - 7 * (n - 1));
+  const out = [];
+  for (let i = 0; i < n; i++) { const a = new Date(s); a.setDate(s.getDate() + 7 * i); const b = new Date(a); b.setDate(a.getDate() + 7); out.push({ a: rhyKey(a), b: rhyKey(b), m: a.getDate() <= 7 || (i === 0 && a.getDate() <= 14) ? a.toLocaleDateString('en-US', { month: 'short' }) : '' }); }
+  return out;
+}
+function rhyStrip(weeks, dates, kind, list) {   // kind 'g' | 's'; a week with something in it opens that week's details
+  const on = w => (dates || []).some(d => d >= w.a && d < w.b);
+  const items = w => (list || []).filter(m => m.d >= w.a && m.d < w.b);
+  return '<div class="rhy-w">' + weeks.map((w, i) => {
+    const it = items(w), cls = (on(w) ? 'on' : '') + (i === weeks.length - 1 ? ' now' : '') + (kind === 'g' && it.some(m => m.leader && !m.took) ? ' todo' : '');
+    if (!it.length) return '<i class="' + cls + '" aria-hidden="true"></i>';
+    return '<button class="' + cls + '" onclick="rhyTap(\'' + kind + '\',' + i + ')" aria-label="' + esc(fmtDate(w.a, { month: 'long', day: 'numeric' })) + ' week"></button>';
+  }).join('') + '</div>';
+}
+function rhyTap(kind, i) {
+  const r = S.rhythm || {}, w = rhyWeeks(r)[i]; if (!w) return;
+  const L = ccLinks(), day = d => fmtDate(d, { weekday: 'long', month: 'long', day: 'numeric' });
+  let h = '';
+  if (kind === 'g') {
+    ((r.group || {}).list || []).filter(m => m.d >= w.a && m.d < w.b).forEach(m => {
+      let body;
+      if (!m.took) body = '<p>Attendance wasn’t taken for this meeting.</p>' + (m.leader
+        ? '<a class="btn p big" href="' + esc(ccMeetingUrl(m) || L.groups) + '" target="_blank" rel="noopener" onclick="rhyMarkFresh()">Take attendance</a><p class="dim" style="margin-top:8px">Opens this meeting’s attendance in Church Center. Check who came and save, and it shows up here.</p>' : '');
+      else body = '<p>' + (m.me ? '<span class="ok">You were there ✓</span> · ' : 'We missed you this time · ') + m.n + (m.n === 1 ? ' person was' : ' people were') + ' there</p>' +
+        (m.names && m.names.length ? '<div class="rd-names">' + m.names.map(n => '<span>' + esc(n) + '</span>').join('') + '</div>' : '') +
+        (m.leader ? '<a class="btn big" href="' + esc(ccMeetingUrl(m) || L.groups) + '" target="_blank" rel="noopener" onclick="rhyMarkFresh()">Edit in Church Center</a>' : '');
+      h += '<div class="rd"><small>' + esc(m.g) + '</small><b>' + day(m.d) + '</b>' + body + '</div>';
+    });
+  } else {
+    ((r.serve || {}).list || []).filter(m => m.d >= w.a && m.d < w.b).forEach(m => {
+      h += '<div class="rd"><small>Serving</small><b>' + day(m.d) + '</b><p>' + esc(m.team || 'A serve team') + (m.pos ? ' · ' + esc(m.pos) : '') + '</p></div>';
+    });
+  }
+  if (!h) return;
+  $('sheet').innerHTML = h + '<div style="display:flex;justify-content:flex-end;margin-top:6px"><button class="btn g" onclick="closeSheet()">Close</button></div>';
+  $('sheetOv').classList.add('open');
+}
+// After a leader goes to Church Center to take attendance, the next look here asks the server for fresh numbers.
+function rhyMarkFresh() { try { sessionStorage.setItem('rhy_fresh', '1'); } catch (e) {} }
+function rhyWantsFresh() { try { return sessionStorage.getItem('rhy_fresh') === '1'; } catch (e) { return false; } }
+if (typeof document.addEventListener === 'function') document.addEventListener('visibilitychange', () => { if (!document.hidden && rhyWantsFresh() && S.data && !S.preview) loadRhythm(true); });
+function rhyLast(k) { return k ? fmtDate(k, { month: 'short', day: 'numeric' }) + (k.slice(0, 4) !== String(new Date().getFullYear()) ? ', ' + k.slice(0, 4) : '') : ''; }
+function rhythmHtml(r) {
+  const head = '<div class="h-lbl">Your rhythm <span class="dim" style="font-size:13px;font-weight:600">Last 6 months</span></div>';
+  if (!r) return head + '<div class="sc rhy" style="min-height:200px"><div class="dim">Loading…</div></div>';
+  if (!r.ok) return '';
+  const L = ccLinks(), weeks = rhyWeeks(r), g = r.group || {}, sv = r.serve || {};
+  const months = '<div class="rhy-m" aria-hidden="true">' + weeks.map(w => '<span>' + w.m + '</span>').join('') + '</div>' +
+    '<div class="rhy-k"><span>You were there</span><span class="off">Other weeks</span></div>';
+  const times = n => n === 1 ? 'once' : n === 2 ? 'twice' : n + ' times';
+  let gRow;
+  if (g.outside && !(g.names || []).length) gRow = '<div class="rhy-h"><b>' + esc(g.outside.name) + '</b></div><div class="rhy-s">' + (g.outside.desc ? esc(g.outside.desc) : 'Your group outside Living Stones') + '</div>';
+  else if (!g.inGroup) gRow = '<div class="rhy-h"><b>Community group</b></div><div class="rhy-s">Not in a group yet · <a href="#" onclick="go(\'connect\');return false">find your people ›</a></div>';
+  else if (!g.tracked) gRow = '<div class="rhy-h"><b>' + esc((g.names || [])[0] || 'Your group') + '</b></div><div class="rhy-s">Your group hasn’t recorded attendance in Planning Center yet, so there’s nothing to show here. That’s okay!</div>';
+  else gRow = '<div class="rhy-h"><b>' + esc((g.names || [])[0] || 'Your group') + '</b>' + (g.last ? '<em>Last: ' + rhyLast(g.last) + '</em>' : '') + '</div>' +
+    '<div class="rhy-s">' + ((g.dates || []).length ? 'With your group ' + times(g.dates.length) + ' in the last 6 months' : 'We’d love to see you back with your group soon') + '</div>' + rhyStrip(weeks, g.dates, 'g', g.list);
+  let sRow;
+  const nx = sv.next ? ' · next: ' + fmtDate(sv.next, { weekday: 'short', month: 'short', day: 'numeric' }) : '';
+  if (!sv.onTeam && !(sv.dates || []).length) sRow = '<div class="rhy-h"><b>Serving</b></div><div class="rhy-s">Not on a serve team yet · <a href="' + esc(L.serve) + '" target="_blank" rel="noopener">find a team ›</a></div>';
+  else sRow = '<div class="rhy-h"><b>Serving</b>' + (sv.last ? '<em>Last: ' + rhyLast(sv.last) + '</em>' : '') + '</div>' +
+    '<div class="rhy-s">' + ((sv.dates || []).length ? 'Served ' + times(sv.dates.length) + ' in the last 6 months' : sv.last ? 'Not scheduled in the last 6 months' : 'You haven’t been scheduled yet') + nx + '</div>' + rhyStrip(weeks, sv.dates, 's', sv.list);
+  sRow += '<div id="svOpenBox">' + serveOpenHtml() + '</div>';
+  const gStrip = !!(g.inGroup && g.tracked), sStrip = !!(sv.onTeam || (sv.dates || []).length);   // month labels sit under the lower strip
+  const todo = (g.list || []).filter(m => m.leader && !m.took).length;
+  const tip = (g.list || []).length || (sv.list || []).length ? '<div class="rhy-tip">Tap a week for details' + (todo ? ' · a dashed week still needs attendance' : '') + '</div>' : '';
+  return head + '<div class="sc rhy"><div class="rhy-r">' + gRow + (gStrip && !sStrip ? months : '') + '</div><div class="rhy-r">' + sRow + (sStrip ? months : '') + '</div>' + tip + '</div>';
+}
+let _rhyLoading = false;
+async function loadRhythm(force) {
+  if (S.preview || _rhyLoading || !tokenGet()) return;
+  if (rhyWantsFresh()) force = true;
+  if (!force && S.rhythm && Date.now() - (S.rhythmAt || 0) < 30 * 60 * 1000) return;
+  if (!force && !S.rhythm && rhyCacheGet() && Date.now() - rhyCacheAt() < 30 * 60 * 1000) { S.rhythm = rhyCacheGet(); S.rhythmAt = rhyCacheAt(); return; }
+  _rhyLoading = true;
+  const fresh = rhyWantsFresh();
+  let r = null; try { r = await api(Object.assign({ action: 'jr_rhythm', token: tokenGet() }, fresh ? { fresh: 1 } : {}), 2); } catch (e) {} finally { _rhyLoading = false; }
+  if (fresh && r && r.ok) { try { sessionStorage.removeItem('rhy_fresh'); } catch (e) {} }
+  if (r && r.ok) { S.rhythm = r; S.rhythmAt = Date.now(); try { localStorage.setItem(RHY_CACHE, JSON.stringify({ tok: tokKey(), at: Date.now(), data: r })); } catch (e) {} }
+  else if (r && r.signin) S.rhythm = { ok: false };
+  else if (!S.rhythm) S.rhythm = rhyCacheGet() || { ok: false };   // couldn't reach it: keep the last good one, or quietly hide
+  const box = $('rhyBox'); if (box) box.innerHTML = rhythmHtml(S.rhythm);
+  loadServeOpen();
+}
+
+// ── Serving → what's still needed in the next four Sundays (every signed-in person) ──
+// From the fast API's /jr/serve_open (same Planning Center data as the staff "Still needed this Sunday" card). The person's
+// own teams come first. "Sign up" records a request the team's leaders see (Planning Center schedules people, so a member
+// can only ask); "Message leader" opens a ready-to-send text or email to the team's point leader.
+function svoPending(t, date, pos) { return ((S.serveOpen || {}).pending || []).some(r => r.status === 'pending' && r.team === String(t.id) && r.date === date && r.position === pos); }
+function svoMsg(t, d, pos) {
+  const L = t.leader || {}; if (!L.name || L.isMe) return '';
+  const team = String(t.name || 'the team').replace(/\s+team$/i, '') + ' team', when = fmtDate(d, { weekday: 'long', month: 'short', day: 'numeric' });
+  const msg = 'Hi ' + L.name.split(' ')[0] + ', I saw the ' + team + ' needs a ' + pos + ' on ' + when + '. I’d love to help — is there still room?';
+  let ph = String(L.phone || '').replace(/[^\d+]/g, ''); if (/^\d{10}$/.test(ph)) ph = '+1' + ph; else if (/^1\d{10}$/.test(ph)) ph = '+' + ph;
+  if (ph) return '<a class="btn g" href="sms:' + esc(ph) + '?&body=' + encodeURIComponent(msg) + '">Message leader</a>';
+  if (L.email) return '<a class="btn g" href="mailto:' + esc(L.email) + '?subject=' + encodeURIComponent('Serving on ' + when) + '&body=' + encodeURIComponent(msg) + '">Message leader</a>';
+  return '';
+}
+function svoTeam(t, d, di) {
+  const L = t.leader || {};
+  let h = '<div class="svo-t"><div class="svo-tn">' + esc(t.name) + (L.name ? '<em>Leader: ' + esc(L.name) + '</em>' : '') + '</div>';
+  t.spots.forEach((sp, i) => {
+    const pend = svoPending(t, d.date, sp.position);
+    const act = pend ? '<span class="svo-pend">Requested · pending</span>'
+      : '<button class="btn p" onclick="svoSignup(' + di + ',\'' + esc(t.id) + '\',' + i + ')">Sign up</button>' + svoMsg(t, d.date, sp.position);
+    h += '<div class="svo-p"><span><b>' + esc(sp.position) + '</b> · ' + sp.qty + ' open' + (sp.time ? ' · ' + esc(sp.time) : '') + '</span><div class="svo-a">' + act + '</div></div>';
+  });
+  return h + '</div>';
+}
+function serveOpenHtml() {
+  const o = S.serveOpen; if (S.preview || !o || !o.ok) return '';
+  const days = o.sundays || [], di = Math.min(S.svWeek || 0, Math.max(0, days.length - 1)), d = days[di]; if (!d) return '';
+  const chips = '<div class="svo-wk" role="tablist">' + days.map((x, i) => {
+    const n = (x.teams || []).reduce((a, t) => a + t.total, 0);
+    return '<button role="tab" class="' + (i === di ? 'on' : '') + '" onclick="svoWeek(' + i + ')">' + esc(fmtDate(x.date, { month: 'short', day: 'numeric' })) + '<small>' + (x.planFound ? n + ' open' : 'no plan yet') + '</small></button>';
+  }).join('') + '</div>';
+  let body = '';
+  if (!d.planFound) body = '<div class="svo-e">Planning Center doesn’t have this Sunday’s plan yet — check back soon.</div>';
+  else if (!d.teams.length) body = '<div class="svo-e">Every team is fully staffed this Sunday. Thank you, church!</div>';
+  else {
+    const mine = d.teams.filter(t => t.mine);
+    if (mine.length) body += '<div class="svo-k">Your teams</div>' + mine.map(t => svoTeam(t, d, di)).join('');
+    else if ((o.myTeams || []).length) body += '<div class="svo-e">Your teams are fully staffed this Sunday — thank you!</div>';
+  }
+  const rv = (o.toReview || []).map(r => '<div class="svo-r"><b>' + esc(r.name || 'Someone') + '</b> would like to serve · ' + esc(r.teamName) + ' · ' + esc(r.position) + ' · ' + esc(fmtDate(r.date, { weekday: 'short', month: 'short', day: 'numeric' })) +
+    '<div class="svo-a"><button class="btn p" onclick="svoResolve(\'' + esc(r.id) + '\',\'' + esc(r.team) + '\',\'done\')">Got them</button><button class="btn g" onclick="svoResolve(\'' + esc(r.id) + '\',\'' + esc(r.team) + '\',\'declined\')">Can’t use</button></div></div>').join('');
+  return '<div class="svo"><div class="svo-h"><b>Needed in the next 4 Sundays</b><span>Planning Center</span></div>' + chips + body + (rv ? '<div class="svo-k">Asking to join your teams</div>' + rv : '') + '</div>';
+}
+function svoRender() { const b = $('svOpenBox'); if (b) b.innerHTML = serveOpenHtml(); }
+function svoWeek(i) { S.svWeek = i; svoRender(); }
+let _svoLoading = false;
+async function loadServeOpen(force) {
+  if (S.preview || _svoLoading || !tokenGet() || tokenGet() === DEMO_TOKEN || isDemo()) return;
+  if (!force && S.serveOpen && Date.now() - (S.serveOpenAt || 0) < 3 * 60 * 1000) return;
+  _svoLoading = true;
+  try {
+    const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 25000);
+    const r = await fetch(FAST + '/jr/serve_open?sundays=4', { headers: { Authorization: 'Bearer ' + tokenGet() }, cache: 'no-store', signal: ctl.signal }).finally(() => clearTimeout(t));
+    const j = r.ok ? await r.json() : null;
+    if (j && j.ok && j.for === 'jr_serve_open') { S.serveOpen = j; S.serveOpenAt = Date.now(); }
+  } catch (e) {} finally { _svoLoading = false; }
+  svoRender();
+}
+async function svoPost(body) {
+  const r = await fetch(FAST + '/jr/serve_request', { method: 'POST', headers: { Authorization: 'Bearer ' + tokenGet(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  return r.json().catch(() => ({ ok: false }));
+}
+async function svoSignup(di, tid, i) {
+  const d = ((S.serveOpen || {}).sundays || [])[di], t = d && d.teams.find(x => String(x.id) === String(tid)), sp = t && t.spots[i]; if (!sp) return;
+  const o = S.serveOpen; o.pending = (o.pending || []).concat([{ team: String(t.id), date: d.date, position: sp.position, status: 'pending' }]); svoRender();   // show it at once
+  let r = null; try { r = await svoPost({ action: 'request', team: t.id, teamName: t.name, date: d.date, position: sp.position, time: sp.time }); } catch (e) {}
+  if (r && r.ok) { toast('Requested — ' + (t.leader && t.leader.name ? t.leader.name.split(' ')[0] + ' will see it' : 'your team leader will see it')); loadServeOpen(true); }
+  else { o.pending = o.pending.slice(0, -1); svoRender(); toast(r && r.error ? r.error : 'Couldn’t send that just now — try “Message leader” instead.'); }
+}
+async function svoResolve(id, team, status) {
+  const o = S.serveOpen; if (o) { o.toReview = (o.toReview || []).filter(r => r.id !== id); svoRender(); }
+  let r = null; try { r = await svoPost({ action: 'resolve', id, team, status }); } catch (e) {}
+  if (!r || !r.ok) { toast('Couldn’t save that — try again.'); loadServeOpen(true); }
+}
+function stepIconKey(id) { return /group/.test(id) ? 'group' : /serve/.test(id) ? 'serve' : /baptism/.test(id) ? 'baptism' : /member/.test(id) ? 'membership' : /lead/.test(id) ? 'lead' : /give/.test(id) ? 'give' : 'invite'; }
+const STEP_PHOTO = { baptism: /baptism/i, group: /connection sunday|community group|group/i, serve: /coffee team|first impressions|serve team|volunteer/i,
+  give: /mission/i, membership: null, lead: /leader/i, invite: /sunday gathering/i };
+// Step photos we chose ourselves (assets/photos/, picked from the church's content Drive) — these win over event posters.
+const STEP_OWN_PHOTO = { membership: '/assets/photos/fully-belong.jpg' };
+// Every step image carries the app's warm gold-brown wash with the step's title on it (Brad, 2026-10-19).
+const STEP_OWN_TITLE = {
+  membership: ['Family Member', 'The Living Stones family'], baptism: ['Baptism', 'Go public with your faith'],
+  group: ['Community Group', 'Find your people'], serve: ['Serve', 'Use your gifts'], give: ['Generosity', 'Part of the journey'],
+  lead: ['Lead', 'Help others take a step'], invite: ['Share', 'Invite · tell your story · share the gospel'] };
+function fyOverlay(k) { const tt = STEP_OWN_TITLE[k] || STEP_OWN_TITLE.invite; return '<div class="fy-ov"><svg viewBox="0 0 24 24">' + (ICONS[k] || ICONS.invite) + '</svg><b>' + esc(tt[0]) + '</b><small>' + esc(tt[1]) + '</small></div>'; }
+function fyArt(box, k) { const tt = STEP_OWN_TITLE[k] || STEP_OWN_TITLE.invite; box.classList.remove('has', 'ov', 'poster'); box.classList.add('art'); box.innerHTML = '<div class="fy-art"><svg viewBox="0 0 24 24">' + (ICONS[k] || ICONS.invite) + '</svg><b>' + esc(tt[0]) + '</b><small>' + esc(tt[1]) + '</small></div>'; }
+function fyPhoto(box, k, src, poster) {   // the photo + wash + title; the warm titled panel if it can't load
+  box.classList.add('has', 'ov'); box.classList.toggle('poster', !!poster); box.innerHTML = '<img src="' + esc(src) + '" alt="" loading="lazy">' + fyOverlay(k);
+  box.querySelector('img').onerror = () => fyArt(box, k);
+}
+function loadForYouImage() {
+  const s = S.homeStep; if (!s) return;
+  const k = stepIconKey(s.id), own = STEP_OWN_PHOTO[k];
+  if (own) { const box = $('fyImg'); if (box) fyPhoto(box, k, own); return; }
+  eosData().then(j => {
+    const box = $('fyImg'); if (!box || S.homeStep !== s) return;   // the card moved on (Next idea / Not right now): its own call draws its image
+    const re = STEP_PHOTO[k] || STEP_PHOTO.invite;
+    const ev = ((j && j.calendar && j.calendar.events) || []).filter(e => e.img && re.test(e.name || '')).sort((a, b) => a.dateKey < b.dateKey ? 1 : -1)[0];
+    if (ev) fyPhoto(box, k, ev.img, true); else fyArt(box, k);
+  });
+}
+let _news2 = [];
+function loadNewsCards(d) {
+  Promise.all([eosData(), dashData()]).then(([j, dash]) => {
+    const el = $('news2'); if (!el) return;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const evs = ((j && j.calendar && j.calendar.events) || []).filter(e => e.visibleCC && !e.rbd && new Date(e.dateKey + 'T12:00:00') >= today)
+      .sort((a, b) => a.dateKey < b.dateKey ? -1 : 1);
+    const key = nextSundayKey(), sun = evs.find(e => e.dateKey === key && /sunday gathering/i.test(e.name || ''));
+    const plan = ((dash && dash.sundayPlans) || []).find(x => x.date === key), svc = plan && (plan.services || []).find(x => x.title);
+    const seen = {}, rest = [];
+    const fyRe = S.homeStep ? (STEP_PHOTO[stepIconKey(S.homeStep.id)] || null) : null;   // don't repeat what For You already shows
+    const teen = (d.kids || []).some(k => k.age >= 11 && k.age <= 18);
+    evs.filter(e => !/sunday gathering/i.test(e.name || '') && e.img && !(fyRe && fyRe.test(e.name || '')) && (teen || !/student|youth/i.test(e.name || ''))).forEach(e => { const k = String(e.name).trim().toLowerCase(); if (!seen[k]) { seen[k] = 1; rest.push(e); } });
+    rest.sort((a, b) => (newsTag(b.name || '', d) ? 1 : 0) - (newsTag(a.name || '', d) ? 1 : 0));
+    const cards = [];
+    if (sun) cards.push(Object.assign({}, sun, { _kick: 'This Sunday', _title: svc ? svc.title.replace(/\s*\([^)]*\)\s*$/, '') : 'Sunday gatherings', _meta: String(sun.desc || '8:00, 9:30, or 11:00').replace(/^Join us Sundays at /i, '').replace(/\.$/, '') }));
+    rest.slice(0, 4).forEach(e => cards.push(Object.assign({}, e, { _kick: newsTag(e.name || '', d) || fmtDate(e.dateKey, { weekday: 'short', month: 'short', day: 'numeric' }), _title: String(e.name).trim(), _meta: evWhen(e) })));
+    _news2 = cards; _evShown = cards;
+    el.innerHTML = cards.length ? cards.map((c, n) => '<button class="nc" onclick="evOpen(' + n + ')">' + (c.img ? '<img src="' + esc(c.img) + '" alt="" loading="lazy">' : '<span class="nc-ph"></span>') +
+      '<span class="nc-b"><small>' + esc(c._kick) + '</small><b>' + esc(c._title) + '</b><em>' + c._meta + '</em></span></button>').join('')
+      : '<div class="dim">Nothing coming up right now.</div>';
+  });
+}
+// The church data files are ~1.2 MB together; the home page only needs a few cards from them.
+// So: keep a small copy on this device (SLIM_KEY), draw from it the instant the page opens, and refresh it
+// once in the background (the big files are fetched only then, never on the way to first paint).
+const SLIM_KEY = 'lssr_jr_slim_v1';
+function slimGet() { try { return JSON.parse(localStorage.getItem(SLIM_KEY) || 'null'); } catch (e) { return null; } }
+let _slimP = null, _slimLive = null;
+function slimShape(sl) { return { eos: { calendar: { events: sl.events || [] } }, dash: { sundayPlans: sl.plans || [], serveTeams: sl.teams || [], communityGroupsDetailed: { groupAttendance: sl.groups || [] } } }; }
+function slimFresh() {   // the one background fetch per page load; resolves with the slim data (or null offline)
+  return _slimP = _slimP || Promise.all([
+    fetch('/eos-data.json').then(r => r.ok ? r.json() : null).catch(() => null),
+    fetch('/dashboard-data.json').then(r => r.ok ? r.json() : null).catch(() => null)
+  ]).then(([e, d]) => {
+    if (!e && !d) return null;
+    const old = slimGet() || {};
+    const sl = {
+      at: Date.now(),
+      events: e ? ((e.calendar && e.calendar.events) || []).filter(x => x.visibleCC) : old.events || [],
+      plans: d ? (d.sundayPlans || []).map(x => ({ date: x.date, services: (x.services || []).map(v => ({ title: v.title, series: v.series, preacher: v.preacher })) })) : old.plans || [],
+      teams: d ? (d.serveTeams || []).map(x => ({ name: x.name, needed: x.needed, current: x.current })) : old.teams || [],
+      groups: d ? (((d.communityGroupsDetailed || {}).groupAttendance) || []).map(x => ({ name: x.name, schedule: x.schedule, url: x.url || '' })) : old.groups || []
+    };
+    try { localStorage.setItem(SLIM_KEY, JSON.stringify(sl)); } catch (x) {}
+    return sl;
+  });
+}
+// Cached copy now when there is one (and a quiet refresh behind it); otherwise wait for the first fetch.
+function slimData() {
+  const have = slimGet();
+  if (have) { slimFresh().then(sl => { if (sl && JSON.stringify(sl.events) + JSON.stringify(sl.plans) !== JSON.stringify(have.events) + JSON.stringify(have.plans)) slimChanged(); }); return Promise.resolve(have); }
+  return slimFresh();
+}
+let _slimTimer = 0;
+function slimChanged() {   // fresh church data differs from what was drawn: redraw only the cards that use it, in place
+  clearTimeout(_slimTimer); _slimTimer = setTimeout(() => {
+    if (!S.data || !S.rendered) return;
+    if ($('news2')) { loadNewsCards(S.data); loadForYouImage(); }
+  }, 0);
+}
+function dashData() { return slimData().then(sl => sl ? slimShape(sl).dash : null); }
+function eosData() { return slimData().then(sl => sl ? slimShape(sl).eos : null); }
+function nextSundayKey() { const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + ((7 - d.getDay()) % 7)); return d.toISOString().slice(0, 10); }
+function loadSunday() {
+  const key = nextSundayKey();
+  Promise.all([eosData(), dashData()]).then(([eos, dash]) => {
+    const el = $('jrSunday'); if (!el) return;
+    const evs = ((eos && eos.calendar && eos.calendar.events) || []).filter(e => e.dateKey === key && e.visibleCC);
+    const gather = evs.find(e => /sunday gathering/i.test(e.name || ''));
+    const special = evs.filter(e => e !== gather && !/student|youth/i.test(e.name || '')).slice(0, 3);
+    const plan = ((dash && dash.sundayPlans) || []).find(s => s.date === key);
+    const svc = plan && (plan.services || []).find(s => s.title) || null;
+    el.className = '';
+    el.innerHTML = '<div class="sun-d">' + fmtDate(key, { weekday: 'long', month: 'long', day: 'numeric' }) + '</div>' +
+      (svc ? '<div class="sun-t">' + esc(svc.title) + '</div><div class="dim">' + [svc.series ? esc(svc.series) : '', svc.preacher ? esc(svc.preacher) : ''].filter(Boolean).join(' · ') + '</div>' : '') +
+      '<div class="sun-times">' + (gather ? esc(String(gather.desc || 'Join us Sundays at 8:00, 9:30, or 11:00.').replace(/^Join us Sundays at /i, '')) : '8:00 · 9:30 · 11:00') + '</div>' +
+      (special.length ? '<div class="sun-x">' + special.map(e => '<span>' + esc(String(e.name).trim()) + '</span>').join('') + '</div>' : '') +
+      '<div class="dim" style="margin-top:8px">95 Foothill Drive, Reno · <a href="https://maps.apple.com/?q=Living+Stones+South+Reno+95+Foothill+Dr+Reno+NV" target="_blank" rel="noopener">Directions</a></div>';
+  });
+}
+// ── Events: the whole church calendar, tagged for you, register in one tap ──────
+const EV_FILTERS = [['all', 'All'], ['you', 'For you'], ['kids', 'Kids & students'], ['classes', 'Classes & groups'], ['outreach', 'Missions & outreach']];
+let _evFilter = 'all', _evShown = [];
+function evKind(n) {
+  return /student|youth|stepping stones|\bkids?\b|vbs|camp/i.test(n) ? 'kids' : /study|class|fundamentals|grief|course|group|financial peace|marriage/i.test(n) ? 'classes'
+    : /mission|outreach|serve day|food|drive|trip/i.test(n) ? 'outreach' : 'other';
+}
+function viewEvents() {
+  return '<h1 class="pg-t">Events</h1><p class="pg-s">Make time for life together.</p>' +
+    '<div class="chips" id="evF">' + EV_FILTERS.map(f => '<button class="' + (f[0] === _evFilter ? 'on' : '') + '" onclick="_evFilter=\'' + f[0] + '\';loadEvents(S.data)">' + f[1] + '</button>').join('') + '</div>' +
+    '<div class="sc"><div id="evList" class="dim">Loading…</div></div>';
+}
+function loadEvents(d) {
+  document.querySelectorAll('#evF button').forEach((b, i) => b.classList.toggle('on', EV_FILTERS[i][0] === _evFilter));
+  eosData().then(j => {
+    const box = $('evList'); if (!box) return;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const until = new Date(today.getTime() + 120 * 864e5), key = x => new Date(x + 'T12:00:00');
+    const seen = {}, list = [];
+    ((j && j.calendar && j.calendar.events) || []).filter(e => e.visibleCC && !e.rbd && key(e.endKey || e.dateKey) >= today && key(e.dateKey) <= until && !/sunday gathering/i.test(e.name || ''))
+      .sort((a, b) => a.dateKey < b.dateKey ? -1 : a.dateKey > b.dateKey ? 1 : 0)
+      .forEach(e => { const nk = String(e.name).trim().toLowerCase(); if (seen[nk]) { seen[nk].more++; return; } const it = { e, more: 0, tag: newsTag(e.name || '', d), kind: evKind(e.name || '') }; seen[nk] = it; list.push(it); });
+    const match = list.filter(it => _evFilter === 'all' || (_evFilter === 'you' ? !!it.tag : it.kind === _evFilter)), show = S.evAll ? match : match.slice(0, 8);
+    _evShown = show.map(it => it.e);
+    if (!j) { box.innerHTML = 'Couldn’t load events just now — see the <a href="' + CC + '/calendar" target="_blank" rel="noopener">church calendar</a>.'; return; }
+    if (!show.length) { box.className = 'dim'; box.innerHTML = _evFilter === 'you' ? 'Nothing picked out just for you right now — browse All.' : 'Nothing coming up here right now.'; return; }
+    const wk = dk => { const dd = key(dk), diff = Math.floor((dd - today) / 864e5), m = dd.toLocaleDateString('en-US', { month: 'long' });
+      return diff < 7 ? 'Next 7 days' : dd.getMonth() === today.getMonth() && dd.getFullYear() === today.getFullYear() ? 'Later in ' + m : m; };
+    let last = '', html = '';
+    show.forEach((it, i) => { const e = it.e, g = wk(e.dateKey); if (g !== last) { html += '<h4 class="evh">' + g + '</h4>'; last = g; }
+      const img = e.img || (e.imgLocal ? '/' + e.imgLocal : '');
+      html += '<button class="evr" onclick="evOpen(' + i + ')">' + (img ? '<img src="' + esc(img) + '" alt="" loading="lazy">' : '<span class="evd"><b>' + key(e.dateKey).getDate() + '</b>' + key(e.dateKey).toLocaleDateString('en-US', { month: 'short' }) + '</span>') +
+        '<span class="evt">' + (it.tag ? '<em>' + esc(it.tag) + '</em>' : '') + '<b>' + esc(String(e.name).trim()) + '</b><small>' + evWhen(e) + (it.more ? ' · ' + (it.more >= 3 ? 'weekly' : 'more dates') : '') + '</small></span>' + chev + '</button>';
+    });
+    if (match.length > show.length) html += '<button class="btn sm ev-more" onclick="S.evAll=true;loadEvents(S.data)">Show all ' + match.length + ' events</button>';
+    box.className = 'evl'; box.innerHTML = html;
+  });
+}
+function evWhen(e) {
+  const d1 = fmtDate(e.dateKey, { weekday: 'short', month: 'short', day: 'numeric' }), d2 = e.endKey && e.endKey !== e.dateKey ? ' – ' + fmtDate(e.endKey, { month: 'short', day: 'numeric' }) : '';
+  return d1 + d2 + (e.time && e.time !== '12:00 AM' ? ' · ' + esc(e.time) : '');
+}
+function evOpen(i) {
+  const e = _evShown[i]; if (!e) return;
+  const img = e.img || (e.imgLocal ? '/' + e.imgLocal : ''), where = String(e.location || '').replace(/^Living Stones South Reno - /, '');
+  $('sheet').innerHTML = (img ? '<img class="sh-img" src="' + esc(img) + '" alt="">' : '') +
+    '<h3>' + esc(String(e.name).trim()) + '</h3><div class="dim">' + evWhen(e) + (e.timeEnd && e.time !== '12:00 AM' ? ' – ' + esc(e.timeEnd) : '') + (where ? '<br>' + esc(where) : '') + '</div>' +
+    (e.desc || e.summary ? '<p class="sh-desc">' + esc(e.desc || e.summary).slice(0, 700) + '</p>' : '') +
+    '<div class="sh-acts">' + (e.reg ? ext(e.reg, 'Register', 'btn p') : '') + (e.url ? ext(e.url, e.reg ? 'Details' : 'Details & sign-up', e.reg ? 'btn' : 'btn p') : '') +
+    '<button class="btn" onclick="addToCal(' + i + ')">Add to my calendar</button><button class="btn g" onclick="closeSheet()">Close</button></div>';
+  $('sheetOv').classList.add('open');
+}
+function icsFor(e) {
+  const tm = s => { const m = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(String(s || '').trim()); if (!m) return null; let h = +m[1] % 12; if (/pm/i.test(m[3])) h += 12; return [h, +m[2]]; };
+  const pad = n => String(n).padStart(2, '0'), day = k => String(k).replace(/-/g, ''), st = tm(e.time), en = tm(e.timeEnd);
+  let when;
+  if (!st || e.time === '12:00 AM') { const nd = new Date((e.endKey || e.dateKey) + 'T12:00:00'); nd.setDate(nd.getDate() + 1);
+    when = 'DTSTART;VALUE=DATE:' + day(e.dateKey) + '\r\nDTEND;VALUE=DATE:' + nd.toISOString().slice(0, 10).replace(/-/g, ''); }
+  else when = 'DTSTART;TZID=America/Los_Angeles:' + day(e.dateKey) + 'T' + pad(st[0]) + pad(st[1]) + '00' + (en ? '\r\nDTEND;TZID=America/Los_Angeles:' + day(e.endKey || e.dateKey) + 'T' + pad(en[0]) + pad(en[1]) + '00' : '');
+  const q = s => String(s || '').replace(/[\;,]/g, m => '\\' + m).replace(/\r?\n/g, '\\n');
+  return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Living Stones South Reno//App//EN', 'BEGIN:VEVENT',
+    'UID:' + day(e.dateKey) + '-' + String(e.name).trim().replace(/\W+/g, '-').slice(0, 40) + '@lssouthreno.com',
+    'DTSTAMP:' + new Date().toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z', when, 'SUMMARY:' + q(String(e.name).trim()),
+    'LOCATION:' + q(e.location), 'URL:' + (e.url || ''), 'DESCRIPTION:' + q(e.desc || e.summary), 'END:VEVENT', 'END:VCALENDAR']
+    .map(l => l.length <= 74 ? l : l.match(/.{1,73}/g).join('\r\n ')).join('\r\n');   // fold long lines (RFC 5545)
+}
+function addToCal(i) {
+  const e = _evShown[i]; if (!e) return;
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([icsFor(e)], { type: 'text/calendar' }));
+  a.download = String(e.name).trim().replace(/[^\w]+/g, '-').slice(0, 40) + '.ics'; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500); toast('Added — open the file to save it to your calendar.');
+}
+
+// ── Connect: your groups & teams, rosters for leaders, find a place ──────────────
+function srow(title, sub, href, onclick, right) {   // one simple row: title, small line, chevron
+  const open = onclick ? '<a class="sr" href="#" onclick="' + onclick + ';return false">' : href ? '<a class="sr" href="' + esc(href) + '" target="_blank" rel="noopener">' : '<div class="sr">';
+  return open + '<span><b>' + title + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</span>' + (right ? '<em>' + right + '</em>' : '') + (href || onclick ? chev + '</a>' : '</div>');
+}
+function viewConnect(d) {
+  const L = ccLinks(), sv = d.serving || {}, groups = d.groups || [], teams = sv.teams || [];
+  const serveUp = (d.upcoming || []).filter(u => /serv/i.test(u.what || ''));
+  const og = d.outsideGroup && d.outsideGroup.name ? d.outsideGroup : null;
+  const mine = groups.map(g => srow(esc(g.name), 'Community group' + (g.leader ? ' · you lead it' : ''), g.url || L.groups)).join('') +
+    (og ? srow(esc(og.name), 'Your group' + (og.desc ? ' · ' + esc(og.desc) : ''), '') : '') +
+    teams.map(x => srow(esc(x.name || x), 'Serve team' + (sv.servedThisYear ? ' · served ' + sv.servedThisYear + '× this year' : ''), L.me)).join('') +
+    serveUp.map(u => srow('You’re serving', fmtDate(u.date, { weekday: 'long', month: 'short', day: 'numeric' }) + ' · ' + esc(u.what.replace(/^Serving\s*·\s*/i, '')), L.me)).join('');
+  const L2 = d.leading && ((d.leading.groups || []).length || (d.leading.teams || []).length);
+  return '<h1 class="pg-t">Groups</h1><p class="pg-s">Find people to know and a place to serve.</p>' +
+    '<div class="h-lbl">Yours</div><div class="sc">' + (mine || srow('Find your people', 'Most of us found our closest friends in a group', L.groups)) + '</div>' +
+    (L2 ? '<details class="sc roster-d"><summary>' + srow('Your people', 'Who’s in the groups and teams you lead') + '</summary><div class="roster-in">' + leadHtml(d.leading) + '</div></details>' : '') +
+    '<div class="h-lbl">Find a group <a href="' + esc(L.groups) + '" target="_blank" rel="noopener">All groups</a></div>' +
+    '<div class="sc"><input class="search" id="grpQ" type="search" placeholder="Search by name or day" oninput="loadFind()"><div id="grpList" class="dim">Loading…</div></div>' +
+    '<div class="h-lbl">Teams that need you <a href="' + esc(L.serve) + '" target="_blank" rel="noopener">Sign up</a></div>' +
+    '<div class="sc"><div id="jrTeamList" class="dim">Loading…</div></div>';
+}
+function loadFind() {
+  const L = ccLinks();
+  dashData().then(dd => {
+    const gl = $('grpList'), tl = $('jrTeamList'); if (!gl || !tl) return;
+    const q = (($('grpQ') || {}).value || '').toLowerCase().trim();
+    const groups = (((dd || {}).communityGroupsDetailed || {}).groupAttendance || []).filter(g => !q || (g.name + ' ' + (g.schedule || '')).toLowerCase().indexOf(q) >= 0);
+    gl.className = groups.length ? '' : 'dim';
+    const lim = q ? 20 : 5;
+    gl.innerHTML = groups.length ? groups.slice(0, lim).map(g => srow(esc(g.name), esc(String(g.schedule || 'Ask about times').replace(/^Meets /, '')), g.url || L.groups)).join('')
+      + (groups.length > lim ? '<div class="sr-more">' + (groups.length - lim) + ' more · type a day or a name</div>' : '')
+      : (dd ? 'No groups match that — try another word.' : 'Couldn’t load groups — <a href="' + esc(L.groups) + '" target="_blank" rel="noopener">browse them in Church Center</a>.');
+    const teams = ((dd || {}).serveTeams || []).filter(x => (+x.needed || 0) > (+x.current || 0)).sort((a, b) => (b.needed - b.current) - (a.needed - a.current));
+    tl.className = teams.length ? '' : 'dim';
+    tl.innerHTML = teams.length ? teams.slice(0, 3).map(x => srow(esc(x.name), 'Needs ' + (x.needed - x.current) + ' more ' + ((x.needed - x.current) === 1 ? 'person' : 'people'), L.serve)).join('')
+      : 'Every team is full right now — thank you, Living Stones!';
+  });
+}
+
+// ── Give: generosity framed for the giver; Church Center handles the money ─────
+function viewGive(d) {
+  const L = ccLinks(), g = d.giving || {};
+  const me = g.any ? (g.recurring ? 'You give regularly with a recurring gift. Thank you — your generosity is changing lives in South Reno and beyond.'
+      : 'You gave in ' + g.months + ' of the last 12 months. Thank you. A recurring gift makes generosity a rhythm instead of a reminder.')
+    : 'Giving is a step of trust, not a transaction. Whenever you’re ready, it takes about a minute.';
+  return '<h1 class="pg-t">Give</h1><p class="pg-s">Give toward the work we share in South Reno and beyond.</p>' +
+    '<div class="sc pad"><p class="gtxt">' + me + '</p>' + ext(L.giving, 'Give now', 'btn p big') +
+      '<div class="give-2">' + ext(L.giving, g.recurring ? 'Manage my recurring gift' : 'Set up recurring giving', 'btn big') + '</div>' +
+      '<p class="fine2">Opens securely in Church Center. We never see your card or bank details.</p></div>' +
+    '<div class="sc">' + srow('Giving history & statements', 'For your records and taxes', L.giving) +
+      srow('Questions about giving?', 'Send a pastor a note', '', 'openSheet(\'note\',\'I have a question about giving: \')') + '</div>';
+}
+
+// ── Me: your journey, your year, your pastor, Church Center shortcuts, the app ───
+function viewMe(d) {
+  const L = ccLinks(), p = d.person || {}, first = (p.first || '').split(' ')[0];
+  const si = Math.max(0, SEASONS.findIndex(s => s[0] === d.season));
+  const path = '<div class="path">' + SEASONS.map((s, i) => '<div class="stop ' + (i < si ? 'done' : i === si ? 'now' : '') + '"><div class="dot"></div><b>' + s[1] + '</b><span>' + s[2] + '</span></div>').join('') + '</div>';
+  const ms = (d.milestones || []).map(m => srow(esc(m.label), fmtDate(m.date, { month: 'long', year: 'numeric' }))).join('');
+  const pn = d.pastor && d.pastor.name ? d.pastor.name : '', pFirst = pn ? pn.split(' ')[0] : 'a pastor';
+  const isSoft = window.lssrTheme && lssrTheme.get() === 'soft';
+  return '<div class="me-top"><div class="me-av' + (S.preview ? '' : ' tap') + '"' + (S.preview ? '' : ' onclick="openProfile()" title="Change my photo"') + '>' + (p.avatar ? '<img src="' + esc(p.avatar) + '" alt="">' : esc((first || '?').charAt(0))) + '</div>' +
+      '<h1 class="pg-t">' + esc(p.name || first) + '</h1><p class="pg-s">' + (d.member ? 'Family Member' : 'Living Stones') + (p.since ? ' · since ' + fmtDate(p.since, { month: 'long', year: 'numeric' }) : '') + '</p>' +
+      (S.preview ? '' : '<p class="pg-s"><a href="#" onclick="openProfile();return false" style="color:var(--gold);font-weight:700">Edit my profile &amp; photo ›</a></p>') +
+      '<p class="grat">' + gratitudeLine(d) + '</p></div>' +
+    '<div class="h-lbl">Your pastor</div><div class="sc">' +
+      srow(esc(pn || 'Living Stones pastors'), pn ? 'Your shepherding pastor' : 'We’d love to connect you with a pastor') +
+      srow('Send ' + esc(pFirst) + ' a note', 'How you’re doing, a question, anything', '', 'openSheet(\'note\')') +
+      srow('Share a prayer request', 'Our prayer team will pray with you', '', 'openSheet(\'prayer\')') + '</div>' +
+    '<div class="h-lbl">Your journey <a href="#" onclick="return false" style="color:var(--muted)">' + esc((SEASONS[si] || [])[1] || '') + ' season</a></div><div class="sc pad">' + path + (ms ? '<div class="ms2">' + ms + '</div>' : '') + '</div>' +
+    '<div id="jrApp"></div>' +
+    '<div class="h-lbl">Settings</div><div class="sc">' +
+      (S.preview ? '' : srow('Edit my profile', 'Photo, phone, email, address, birthday', '', 'openProfile()')) +
+      srow('Household & family', 'Family members and more · in Church Center', L.me) +
+      srow('Kids check-in', 'Check in from your phone', L.checkins) +
+      (L.membership ? srow('Becoming a Family Member', '', L.membership) : '') +
+      (window.lssrTheme ? srow('Look', isSoft ? 'Soft · tap for Classic dark' : 'Classic dark · tap for Soft', '', 'lssrTheme.toggle()') : '') +
+      (S.preview ? '' : srow('Sign out', 'You’ll need a new code to get back in', '', 'logout()')) + '</div>' +
+    '<p class="quiet2">Private: only you, and the pastors who care for you, see this. See something that isn’t right? <a href="#" onclick="openSheet(\'note\',\'Something in my Living Stones app isn’t right: \');return false">Let us know</a>.</p>';
+}
+function greeting() { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; }
+// ── pathway badges: filled = a step you've taken, gray = one still ahead ──────────
+const BADGES = [
+  ['baptism', 'Baptism', 'baptism', 'Go public with your faith'],
+  ['member', 'Family', 'membership', 'Make Living Stones home'],
+  ['group', 'Group', 'group', 'Do life with others'],
+  ['serve', 'Serve', 'serve', 'Use your gifts for others'],
+  ['give', 'Give', 'give', 'Live generously'],
+  ['lead', 'Lead', 'lead', 'Help someone take their next step']
+];
+// The sixth icon. Brad swapped Lead out for Share (invite · share your story · share your faith, all on the Share page). To bring Lead back for everyone:
+// set SHOW_LEAD = true. Lead's code and data stay intact below. Share has no taken/not-taken data: it is always an open invitation.
+const SHOW_LEAD = false;
+const SHARE_BADGE = ['share', 'Share', 'share', 'Invite, share your story or your faith'];
+const SHOWN_BADGES = () => BADGES.filter(b => b[0] !== 'lead' || SHOW_LEAD).concat(SHOW_LEAD ? [] : [SHARE_BADGE]);
+function badgeDone(k, d) {
+  const L = d.leading || {};
+  return k === 'baptism' ? !!d.baptized : k === 'member' ? !!d.member : k === 'group' ? ((d.groups || []).length > 0 || !!(d.outsideGroup && d.outsideGroup.name))
+    : k === 'serve' ? ((d.serving || {}).teams || []).length > 0 : k === 'give' ? !!(d.giving || {}).any
+    : ((L.groups || []).length + (L.teams || []).length > 0) || (d.groups || []).some(x => x.leader);
+}
+function badgesHtml(d) {
+  return '<div class="badges" aria-label="Your pathway">' + SHOWN_BADGES().map(b => { const act = b[0] === 'share', on = !act && badgeDone(b[0], d);
+    return '<button class="badge' + (on ? ' on' : '') + (act ? ' act' : '') + '" title="' + esc(b[1] + (on ? ' ✓' : ' · ' + b[3])) + '" onclick="badgeTap(\'' + b[0] + '\',' + on + ')"><i><svg viewBox="0 0 24 24">' + ICONS[b[2]] + '</svg></i>' + b[1] + '</button>'; }).join('') + '</div>';
+}
+function badgeTap(k, on) { badgeSheet(k, on); }   // every icon, done or not, opens the same kind of sheet
+// Every pathway icon lands somewhere useful, done or not: a small sheet with the message and a button to the right place.
+function badgeSheet(k, on) {
+  const d = S.data || {}, L = ccLinks(), b = SHOWN_BADGES().find(x => x[0] === k) || BADGES.find(x => x[0] === k) || [], groups = d.groups || [], teams = (d.serving || {}).teams || [];
+  const names = a => a.map(x => esc(x.name || x)).join(', ');
+  const tab = (t, label) => '<button class="btn p" onclick="closeSheet();go(\'' + t + '\')">' + label + '</button>';
+  const note = (label, pre) => '<button class="btn" onclick="openSheet(\'note\',\'' + pre + '\')">' + label + '</button>';
+  const ms = d.milestones || [], msDate = re => { const m = ms.find(x => re.test(x.label)); return m ? m.date : ''; };
+  const dt = iso => fmtDate(iso, { month: 'long', day: 'numeric', year: 'numeric' });
+  const since = iso => fmtDate(iso, { month: 'long', year: 'numeric' });
+  const pastor = d.pastor && d.pastor.name ? esc(d.pastor.name) : '';
+  const plan = (d.baptism || {}).plan;
+  let msg = '', acts = '';
+  if (k === 'baptism') {
+    const when = d.baptizedDate || msDate(/^Baptized$/);
+    msg = on ? (when ? 'You were baptized on <b>' + esc(dt(when)) + '</b>.' : 'You’ve been baptized.') + ' Thank you — that step matters, and your story encourages others.'
+             : plan ? 'You’re scheduled to be baptized on <b>' + esc(dt(plan.date)) + '</b> (' + esc(plan.service) + ' service). We can’t wait.'
+             : 'Baptism is how we go public with our faith in Jesus. Ready to take that step? Sign up and a pastor will reach out.';
+    acts = on ? note('Share my story with a pastor', 'I would love to share my baptism story: ') : plan ? note('Talk to a pastor', 'I have a question about my baptism: ') : ext(L.baptism, 'Sign up to be baptized', 'btn p') + note('Talk to a pastor', 'I have a question about baptism: ');
+  } else if (k === 'member') {
+    const when = d.memberSince || msDate(/Family Member/);
+    msg = on ? 'You’ve been a Family Member' + (when ? ' since <b>' + esc(since(when)) + '</b>' : '') + '.' + (pastor ? ' Your shepherding pastor is <b>' + pastor + '</b>.' : ' A pastor is shepherding you; ask us if you’d like to know who.') + ' Living Stones is your home.'
+             : 'Becoming a Family Member is how we say “you belong here.” It starts with the Family Fundamentals class.' + (pastor ? ' Your pastor, ' + pastor + ', would love to talk.' : '');
+    acts = on ? tab('me', 'My family &amp; profile') + (pastor ? note('Message ' + pastor.split(' ')[0], 'Hi ' + pastor.split(' ')[0] + ', ') : '') : (L.membership ? ext(L.membership, 'Becoming a Family Member', 'btn p') : note('Ask a pastor about it', 'I would like to know more about becoming a Family Member: '));
+  } else if (k === 'group') {
+    const og = d.outsideGroup && d.outsideGroup.name ? d.outsideGroup : null;
+    const list = groups.map(g => '<li><b>' + esc(g.name) + '</b>' + (g.joined ? ' · since ' + esc(since(g.joined)) : '') + (g.leader ? ' · you lead it' : '') + '</li>').join('')
+      + (og ? '<li><b>' + esc(og.name) + '</b>' + (og.desc ? ' · ' + esc(og.desc) : '') + '</li>' : '');
+    const gn = groups.length + (og ? 1 : 0);
+    msg = on ? 'You’re in ' + (gn === 1 ? (og ? 'a group' : 'a community group') : gn + ' groups') + ':<ul style="margin:8px 0 0;padding-left:20px">' + list + '</ul>'
+             : 'Community groups are where we do life together — most of us found our closest friends in one. Find one near you and ask to join.';
+    acts = on ? tab('connect', 'Open my groups') : ext(L.groups, 'Find a group', 'btn p') + tab('connect', 'See groups here');
+  } else if (k === 'serve') {
+    const list = teams.map(t => '<li><b>' + esc(t.name) + '</b>' + (t.since ? ' · since ' + esc(since(t.since)) : '') + '</li>').join('');
+    const n = (d.serving || {}).servedThisYear;
+    msg = on ? 'You serve on:<ul style="margin:8px 0 0;padding-left:20px">' + list + '</ul>' + (n ? '<div style="margin-top:8px">You’ve served ' + n + (n === 1 ? ' time' : ' times') + ' in the last year. Thank you.</div>' : '')
+             : 'There’s a spot that fits how God made you. Pick a team and sign up — we’ll get you set up and walk with you.';
+    acts = on ? tab('connect', 'Open my teams') : ext(L.serve, 'Sign up to serve', 'btn p') + tab('connect', 'See teams here');
+  } else if (k === 'give') {
+    const g = d.giving || {};
+    msg = on ? 'Thank you for giving.' + (g.months ? ' You gave in <b>' + g.months + ' of the last 12 months</b>' + (g.recurring ? ', and you have a recurring gift set up' : '') + '.' : '') + ' Your generosity is changing lives in South Reno and beyond.'
+             : 'Giving is a step of trust, and it takes about a minute. Give once or set up a recurring gift.';
+    acts = tab('give', on ? 'Open giving' : 'Giving made simple');
+  } else if (k === 'share') {
+    msg = 'Someone in your life may be one conversation away from Jesus. Invite them to Sunday, learn to tell your story, or learn how to share the gospel.';
+    acts = '<button class="btn p" onclick="closeSheet();go(\'visit\')">Open Share</button>';
+  } else {
+    const Ls = d.leading || {}, lg = (Ls.groups || []).map(x => x.name), lt = (Ls.teams || []).map(x => x.name);
+    const mine = groups.filter(x => x.leader);
+    const names2 = lg.concat(lt, mine.map(x => x.name).filter(n => lg.indexOf(n) < 0));
+    msg = on ? 'You lead' + (names2.length ? ': <b>' + names2.map(esc).join(', ') + '</b>' : '') + (mine[0] && mine[0].joined ? ' (since ' + esc(since(mine[0].joined)) + ')' : '') + '. Thank you for helping others take their next step.'
+             : 'Leaders are made one conversation at a time. If you’d like to help others take their next step, talk with a pastor about leading a group or team.';
+    acts = on ? tab('connect', 'My group &amp; team') + note('Talk about my next lead step', 'I would like to talk about my next step in leading: ') : note('Talk to a pastor about leading', 'I would like to talk about leading: ');
+  }
+  $('sheet').innerHTML = '<h3>' + esc(b[1] || '') + (on ? ' ✓' : '') + '</h3><div class="dim" style="line-height:1.6">' + msg + '</div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:16px"><button class="btn g" onclick="closeSheet()">Close</button>' + acts + '</div>';
+  $('sheetOv').classList.add('open');
+}
+// ── news & events — kept apart from "For you"; the same events, tagged for this person ──
+function newsTag(n, d) {
+  const kids = d.kids || [];
+  if (/baptism/i.test(n) && !d.baptized) return 'Your next step?';
+  if (/fundamentals|membership|family member|newcomer|starting point/i.test(n) && !d.member) return 'Great for you';
+  if (/student/i.test(n) && kids.some(k => k.age >= 11 && k.age <= 18)) return 'For your teen';
+  if (/stepping stones|kids/i.test(n) && kids.some(k => k.age != null && k.age < 11)) return 'For your kids';
+  if (/bible study|study|group/i.test(n) && !(d.groups || []).length) return 'A great way to connect';
+  return '';
+}
+function loadNews(d) {
+  const el = document.getElementById('jrNews'); if (!el) return;
+  eosData().then(j => {
+    const box = document.getElementById('jrNews'); if (!box) return;
+    const evs = ((j && j.calendar && j.calendar.events) || []);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const until = new Date(today.getTime() + 60 * 864e5), key = x => new Date(x + 'T12:00:00');
+    const teen = (d.kids || []).some(k => k.age >= 11 && k.age <= 18), seen = {}, list = [];
+    evs.filter(e => e.visibleCC && !e.rbd && key(e.dateKey) >= today && key(e.dateKey) <= until && !/sunday gathering/i.test(e.name || ''))
+      .filter(e => teen || !/student|youth/i.test(e.name || ''))
+      .sort((a, b) => a.dateKey < b.dateKey ? -1 : a.dateKey > b.dateKey ? 1 : 0)
+      .forEach(e => { const nk = String(e.name).trim().toLowerCase(); if (seen[nk]) { seen[nk].repeats++; return; } const it = { e, repeats: 0, tag: newsTag(e.name || '', d) }; seen[nk] = it; list.push(it); });
+    // up to 2 picked-for-you per kind, then the rest of the calendar by date (6 total)
+    const perTag = {}, picked = list.filter(it => it.tag && (perTag[it.tag] = (perTag[it.tag] || 0) + 1) <= 2).slice(0, 2);
+    const show = picked.concat(list.filter(it => picked.indexOf(it) < 0 && !it.tag).slice(0, Math.max(0, 4 - picked.length))).slice(0, 4)
+      .sort((a, b) => (b.tag ? 1 : 0) - (a.tag ? 1 : 0) || (a.e.dateKey < b.e.dateKey ? -1 : 1));
+    box.className = show.length ? 'news' : 'dim';
+    box.innerHTML = show.length ? show.map(it => { const e = it.e, img = e.img || (e.imgLocal ? '/' + e.imgLocal : '');
+      return '<a class="nv" href="' + esc(e.url || 'https://lssr.churchcenter.com/calendar') + '" target="_blank" rel="noopener">' + (img ? '<img src="' + esc(img) + '" alt="" loading="lazy">' : '') +
+        '<div>' + (it.tag ? '<em>' + esc(it.tag) + '</em>' : '') + '<b>' + esc(String(e.name).trim()) + '</b><small>' + fmtDate(e.dateKey + 'T12:00:00', { weekday: 'short', month: 'short', day: 'numeric' }) + (e.time && !/^12:00 AM$/.test(e.time) ? ' · ' + esc(e.time) : '') + (it.repeats ? ' · and ' + (it.repeats >= 3 ? 'weekly' : 'more dates') : '') + '</small></div></a>'; }).join('')
+      : j ? 'Nothing on the church calendar in the next couple of months.'
+          : 'Couldn’t load events just now — see the <a href="https://lssr.churchcenter.com/calendar" target="_blank" rel="noopener">church calendar</a>.';
+    tellParent();
+  });
+}
+
+// ── leaders: your group / your team ──────────────────────────────────────────
+function leadHtml(L) {
+  if (!L || (!(L.groups || []).length && !(L.teams || []).length)) return '';
+  const yn = v => v === true ? '<span class="y">Yes</span>' : v === false ? '<span class="nn">Not yet</span>' : '<span class="q">—</span>';
+  const block = (t, kind) => {
+    const other = kind === 'group' ? 'Serving' : 'In a group';
+    const m = t.members || [];
+    const fam = m.filter(x => x.familyMember).length, oth = m.filter(x => kind === 'group' ? x.serving : x.inGroup).length;
+    const rows = m.map(x => '<tr><td class="n">' + esc(x.name) + (x.leader ? '<small>Co-leader</small>' : '') + '</td>' +
+      '<td class="f" data-l="Family Member">' + (x.inProcess ? '<span class="q">In process</span>' : yn(x.familyMember)) + '</td>' +
+      '<td class="o" data-l="' + other + '">' + yn(kind === 'group' ? x.serving : x.inGroup) + '</td>' +
+      '<td class="o" data-l="Baptized">' + yn(x.baptized) + '</td>' +
+      '<td class="s">' + esc(x.step) + '</td></tr>').join('');
+    return '<div class="card" style="margin-top:16px"><div class="card-h"><h3>' + (kind === 'group' ? 'Your group' : 'Your team') + ' · ' + esc(t.name) + '</h3><span class="c">' + m.length + (m.length === 1 ? ' person' : ' people') + '</span></div>' +
+      '<div class="lead-sum"><span><b>' + fam + '</b> of ' + m.length + ' are Family Members</span><span><b>' + oth + '</b> of ' + m.length + ' ' + (kind === 'group' ? 'are serving' : 'are in a group') + '</span><span><b>' + m.filter(x => x.baptized).length + '</b> of ' + m.length + ' are baptized</span></div>' +
+      (m.length ? '<table class="roster"><thead><tr><th>Name</th><th>Family Member</th><th>' + other + '</th><th>Baptized</th><th>A next step you could encourage</th></tr></thead><tbody>' + rows + '</tbody></table>'
+                : '<div class="dim">Nobody on the roster yet.</div>') +
+      '<div class="quiet" style="margin:12px 0 0;font-size:12px">Shown to you because you lead this ' + kind + '. Names and simple yes/no only — never giving or pastoral notes. Suggestions are a starting point, not a grade.</div></div>';
+  };
+  return (L.groups || []).map(g => block(g, 'group')).join('') + (L.teams || []).map(t => block(t, 'team')).join('');
+}
+
+// ── Edit my profile: THEIR OWN Planning Center record (photo, the name they go by, email, mobile, address, birthday) ──
+// The server edits only the signed-in person (from their sign-in token), so nobody can change anyone else.
+const PF = { cur: null, photo: '', changes: null };
+const PF_ADDR = ['street1', 'street2', 'city', 'state', 'zip'];
+function openProfile() {
+  if (S.preview) return;
+  PF.cur = null; PF.photo = ''; PF.changes = null;
+  $('sheet').innerHTML = '<h3>Edit my profile</h3><div class="dim">Changes save straight to your Living Stones profile in Planning Center.</div>' +
+    '<div id="pfBody"><div class="loading" style="padding:34px 0">Getting your details…</div></div>';
+  $('sheetOv').classList.add('open');
+  api({ action: 'jr_profile', token: tokenGet() }).then(r => {
+    if (!$('pfBody')) return;
+    if (r.signin) { closeSheet(); return loadMe(); }
+    if (!r.ok || !r.profile) { $('pfBody').innerHTML = '<div class="err">' + esc(r.error || 'We couldn’t load your details.') + '</div>' + pfFoot(); return; }
+    PF.cur = r.profile; pfForm();
+  });
+}
+function pfFoot() { return '<p class="pf-ft">Family members and anything else: <a href="' + esc(ccLinks().me) + '" target="_blank" rel="noopener">Church Center ›</a></p>'; }
+function pfForm() {
+  const c = PF.cur, a = c.address || {}, ini = esc((c.nickname || c.legalFirst || '?').charAt(0));
+  const f = (id, label, val, attrs, hint) => '<label class="pf-l"><span>' + label + '</span><input class="pf-i" id="pf_' + id + '" value="' + esc(val || '') + '" ' + (attrs || '') + '>' + (hint ? '<small>' + hint + '</small>' : '') + '</label>';
+  $('pfBody').innerHTML = '<div id="pfForm">' +
+    '<div class="pf-ph"><div class="me-av" id="pfAv">' + (c.avatar ? '<img src="' + esc(c.avatar) + '" alt="">' : ini) + '</div>' +
+      '<label class="btn sm">Change photo<input type="file" accept="image/*" id="pfFile" onchange="pfPick(this)" style="display:none"></label></div>' +
+    f('nickname', 'Name you go by', c.nickname, 'autocomplete="nickname" maxlength="40" placeholder="' + esc(c.legalFirst || '') + '"', 'Leave blank to use ' + esc(c.legalFirst || 'your first name') + '.') +
+    f('phone', 'Mobile phone', c.phone, 'type="tel" inputmode="tel" autocomplete="tel" oninput="this.value=fmtPhone(this.value)"', 'This is also the number you sign in with.') +
+    f('email', 'Email', c.email, 'type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" maxlength="120"') +
+    '<div class="pf-l"><span>Home address</span>' +
+      '<input class="pf-i" id="pf_street1" value="' + esc(a.street1) + '" autocomplete="address-line1" placeholder="Street" maxlength="120">' +
+      '<input class="pf-i" id="pf_street2" value="' + esc(a.street2) + '" autocomplete="address-line2" placeholder="Apt, unit (optional)" maxlength="80">' +
+      '<div class="pf-row"><input class="pf-i" id="pf_city" value="' + esc(a.city) + '" autocomplete="address-level2" placeholder="City" maxlength="60">' +
+      '<input class="pf-i st" id="pf_state" value="' + esc(a.state) + '" autocomplete="address-level1" placeholder="State" maxlength="30">' +
+      '<input class="pf-i zp" id="pf_zip" value="' + esc(a.zip) + '" autocomplete="postal-code" inputmode="numeric" placeholder="ZIP" maxlength="10"></div></div>' +
+    f('birthdate', 'Birthday', c.birthdate, 'type="date" autocomplete="bday" max="' + new Date().toISOString().slice(0, 10) + '"') +
+    '<div class="err" id="pfErr"></div>' +
+    '<div class="pf-btns"><button class="btn g" onclick="closeSheet()">Cancel</button><button class="btn p" onclick="pfReview()">Review changes</button></div>' + pfFoot() +
+    '<p class="pf-ft"><a href="/privacy/" target="_blank" rel="noopener">Privacy</a> · <a href="#" class="pf-del" onclick="openDeleteAccount();return false">Delete my account</a></p>' +
+    '</div><div id="pfRev" style="display:none"></div>';
+}
+// A new photo: the whole picture (no cropping — the round frames crop it), at most 800px on its long side,
+// re-encoded as a small JPEG here, so the original file never leaves the phone.
+function pfPick(inp) {
+  const file = inp.files && inp.files[0]; if (!file) return;
+  const url = URL.createObjectURL(file), img = new Image();
+  img.onload = () => {
+    const w = img.naturalWidth, h = img.naturalHeight, k = Math.min(1, 800 / Math.max(w, h)), W = Math.round(w * k), H = Math.round(h * k);
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, W, H);
+    cx.drawImage(img, 0, 0, W, H);
+    URL.revokeObjectURL(url);
+    let q = 0.86, d = cv.toDataURL('image/jpeg', q);
+    while (d.length > 300000 && q > 0.4) { q -= 0.12; d = cv.toDataURL('image/jpeg', q); }
+    PF.photo = d; const av = $('pfAv'); if (av) av.innerHTML = '<img src="' + d + '" alt="">';
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); toast('That photo couldn’t be opened — please try a JPG or PNG.'); };
+  img.src = url;
+}
+function pfVal(id) { const el = $('pf_' + id); return el ? String(el.value || '').trim() : ''; }
+function pfAddrText(a) { a = a || {}; return [a.street1, a.street2, [a.city, [a.state, a.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ')].filter(Boolean).join(', '); }
+// What would change, field by field (only fields that really differ are sent).
+function pfDiff() {
+  const c = PF.cur, ch = {}, rows = [], blank = '<i>(none)</i>';
+  const nick = pfVal('nickname'), nickNow = c.nickname || '';
+  if (nick !== nickNow && !(nick === c.legalFirst && !nickNow)) { ch.nickname = nick; rows.push(['Name you go by', nickNow || c.legalFirst, nick || c.legalFirst]); }
+  const ph = pfVal('phone');
+  if (phoneDigits(ph) !== phoneDigits(c.phone)) { ch.phone = ph; rows.push(['Mobile phone', c.phone, fmtPhone(ph)]); }
+  const em = pfVal('email');
+  if (em.toLowerCase() !== String(c.email || '').toLowerCase()) { ch.email = em; rows.push(['Email', c.email, em]); }
+  const na = {}; PF_ADDR.forEach(k => na[k] = pfVal(k));
+  if (PF_ADDR.some(k => na[k].toLowerCase() !== String((c.address || {})[k] || '').trim().toLowerCase())) { ch.address = na; rows.push(['Home address', pfAddrText(c.address), pfAddrText(na)]); }
+  const bd = pfVal('birthdate');
+  if (bd !== (c.birthdate || '')) { ch.birthdate = bd; rows.push(['Birthday', c.birthdate ? fmtDate(c.birthdate, { month: 'long', day: 'numeric', year: 'numeric' }) : '', bd ? fmtDate(bd, { month: 'long', day: 'numeric', year: 'numeric' }) : '']); }
+  if (PF.photo) { ch.photo = PF.photo; rows.push(['Photo', '', '<img class="pf-new" src="' + PF.photo + '" alt="">']); }
+  return { ch, rows: rows.map(r => [r[0], r[0] === 'Photo' ? '' : (esc(r[1]) || blank), r[0] === 'Photo' ? r[2] : (esc(r[2]) || blank)]) };
+}
+function pfCheck(ch) {
+  if ('phone' in ch && phoneDigits(ch.phone).length !== 10) return 'Please enter a 10-digit mobile number.';
+  if ('email' in ch && !/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(ch.email)) return 'Please check your email address.';
+  if (ch.address && !(ch.address.street1 && ch.address.city && ch.address.state && ch.address.zip)) return 'Please fill in street, city, state and ZIP.';
+  if (ch.address && !/^\d{5}(-?\d{4})?$/.test(ch.address.zip)) return 'Please enter a 5-digit ZIP code.';
+  if ('birthdate' in ch && !ch.birthdate) return 'To remove your birthday, please ask the church office.';
+  return '';
+}
+function pfReview() {
+  const d = pfDiff(), bad = pfCheck(d.ch);
+  $('pfErr').textContent = bad; if (bad) return;
+  if (!d.rows.length) { toast('Nothing has changed yet'); return; }
+  PF.changes = d.ch;
+  $('pfForm').style.display = 'none';
+  const rv = $('pfRev'); rv.style.display = '';
+  rv.innerHTML = '<div class="pf-sum">' + d.rows.map(r => '<div><b>' + r[0] + '</b>' + (r[1] ? '<s>' + r[1] + '</s>' : '') + '<span>' + r[2] + '</span></div>').join('') + '</div>' +
+    '<p class="dim">This updates your profile in Planning Center, so the church office, your group and your teams see it too.</p>' +
+    '<div class="err" id="pfErr2"></div>' +
+    '<div class="pf-btns"><button class="btn g" onclick="pfBack()">Back</button><button class="btn p" id="pfSave" onclick="pfSave()">Save changes</button></div>';
+}
+function pfBack() { $('pfRev').style.display = 'none'; $('pfForm').style.display = ''; }
+async function pfSave() {
+  if (S.preview || !PF.changes) return;
+  const b = $('pfSave'); b.disabled = true; b.textContent = 'Saving…';
+  const rid = 'pf' + Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
+  const r = await api({ action: 'jr_profile_update', token: tokenGet(), changes: PF.changes, rid: rid }, 3);
+  if (r.demo) { closeSheet(); return; }
+  if (r.signin) { closeSheet(); return loadMe(); }
+  const failed = r.failed || [], done = r.changed || [];
+  if (r.profile) PF.cur = r.profile;
+  if (done.length && S.data && S.data.person) {                    // show it right away; the quiet refresh below confirms it
+    const p = S.data.person, np = r.profile || {};
+    if (done.indexOf('nickname') >= 0) p.first = np.nickname || np.legalFirst || p.first;
+    if (done.indexOf('photo') >= 0) p.avatar = np.avatar && np.avatar !== p.avatar ? np.avatar : PF.photo;
+    viewJourney();
+  }
+  if (r.ok && !failed.length) { closeSheet(); toast('Saved. Your profile is up to date.'); }
+  else if (done.length) { PF.photo = done.indexOf('photo') >= 0 ? '' : PF.photo; b.disabled = false; b.textContent = 'Save changes'; $('pfErr2').innerHTML = 'Saved some of it. Not saved: ' + failed.map(x => esc(x.error)).join(' '); }
+  else { b.disabled = false; b.textContent = 'Save changes'; $('pfErr2').textContent = (failed[0] && failed[0].error) || r.error || 'That didn’t save — please try again.'; }
+  if (done.length) loadMe(true);   // fresh: skip the fast API's 10-minute copy
+}
+
+// ── note / prayer ────────────────────────────────────────────────────────────
+function openSheet(kind, prefill) {
+  if (kind === 'profile') return openProfile();
+  const pn = S.data && S.data.pastor && S.data.pastor.name ? S.data.pastor.name.split(' ')[0] : 'your pastor';
+  $('sheet').innerHTML = '<h3>' + (kind === 'prayer' ? 'Share a prayer request' : 'Send ' + esc(pn) + ' a note') + '</h3>' +
+    '<div class="dim">' + (kind === 'prayer' ? 'This goes to our prayer team, and ' + esc(pn) + ' is told too. It’s kept private.' : 'It goes straight to ' + esc(pn) + '.') + '</div>' +
+    '<textarea id="noteTxt" placeholder="' + (kind === 'prayer' ? 'What would you like us to pray for?' : 'Write a few words…') + '">' + esc(prefill || '') + '</textarea>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn g" onclick="closeSheet()">Cancel</button>' +
+    '<button class="btn p" id="noteBtn" onclick="sendNote(\'' + kind + '\')"' + (S.preview ? ' disabled title="Turned off in preview"' : '') + '>Send</button></div>';
+  $('sheetOv').classList.add('open');
+  setTimeout(() => { const t = $('noteTxt'); if (t) { t.focus(); t.setSelectionRange(t.value.length, t.value.length); } }, 50);
+}
+// ── Delete my account (App Store rule 5.1.1(v); promise on /privacy/) ──────────────
+function openDeleteAccount() {
+  if (S.preview) return;
+  $('sheet').innerHTML = '<h3>Delete my account</h3>' +
+    '<p class="dim" style="line-height:1.6">This signs you out on every device and asks Living Stones to remove the personal information we hold about you. ' +
+    'We’ll finish within 30 days and let you know when it’s done. Giving records that tax law requires us to keep are kept. ' +
+    'You’re always welcome back. Just sign in again.</p>' +
+    '<textarea id="delWhy" maxlength="500" placeholder="Anything you’d like us to know? (optional)"></textarea>' +
+    '<div class="err" id="delErr"></div>' +
+    '<div class="pf-btns"><button class="btn g" onclick="closeSheet()">Keep my account</button><button class="btn p del" id="delBtn" onclick="deleteAccount()">Delete my account</button></div>';
+  $('sheetOv').classList.add('open');
+}
+async function deleteAccount() {
+  const b = $('delBtn'); b.disabled = true; b.textContent = 'Deleting…';
+  const why = (($('delWhy') || {}).value || '').trim();
+  let r = await api({ action: 'jr_delete_account', token: tokenGet(), reason: why });
+  // Older server (before the delete action shipped): send the request to the church as a note instead.
+  if (!r.ok && /unknown action/i.test(r.error || '')) r = await api({ action: 'jr_note', token: tokenGet(), kind: 'note', text: 'ACCOUNT DELETION REQUEST: please delete my Living Stones app account and my personal data (privacy policy, 30 days).' + (why ? ' Note: ' + why : '') });
+  if (!r.ok) { b.disabled = false; b.textContent = 'Delete my account'; $('delErr').textContent = r.error || 'Please try again.'; return; }
+  closeSheet(); meCacheClear();
+  try { for (let i = localStorage.length - 1; i >= 0; i--) { const k = localStorage.key(i); if (k && !/^(lssr_theme|lssr_app_snooze|lssr_install_snooze|lssr_soft_css_v\d+)$/.test(k)) localStorage.removeItem(k); } } catch (e) {}
+  await api({ action: 'jr_logout', token: tokenGet() }, 1); tokenSet(''); S.data = null; S.rendered = false; viewSignin(); tellParent();
+  toast('Your account is deleted. We’ll confirm when your information is removed.');
+}
+function closeSheet() { $('sheetOv').classList.remove('open'); $('sheet').className = 'sheet'; }
+// "What do these mean?": a gentle explainer, on the same page
+function helpSheet() {
+  const ic = k => '<svg viewBox="0 0 24 24">' + ICONS[k] + '</svg>';
+  const demo = (k, label, on) => '<div class="badge' + (on ? ' on' : '') + '"><i>' + ic(k) + '</i>' + label + '</div>';
+  const one = (k, name, txt) => '<li>' + ic(k) + '<div><b>' + name + '</b> · ' + txt + '</div></li>';
+  const six = SHOWN_BADGES().map(b => one(b[2], b[1], ({ baptism: 'Going public with your faith in Jesus.', member: 'Making Living Stones your church home.', group: 'Doing life with a few others.', serve: 'Using your gifts to love others.', give: 'Living generously.', lead: 'Helping someone else take their next step.', share: 'Inviting someone to a Sunday gathering.' })[b[0]] || b[3])).join('');
+  $('sheet').className = 'sheet help';
+  $('sheet').innerHTML = '<button class="help-x" onclick="closeSheet()" aria-label="Close">✕</button><h3>What do these mean?</h3>' +
+    '<div class="dim" style="line-height:1.6">You belong to Jesus, and to his church. That belonging grows as we take simple next steps together. These steps are invitations: not requirements, and not a scorecard. Take them whenever you’re ready.</div>' +
+    '<div class="hgrid">' +
+      '<div class="hbox"><div class="hicons">' + demo('baptism', 'Baptism', true) + demo('group', 'Group', true) + '</div><b>Taken</b><span>You’ve taken this step.</span></div>' +
+      '<div class="hbox"><div class="hicons">' + demo('baptism', 'Baptism', false) + demo('group', 'Group', false) + '</div><b>Not yet</b><span>An invitation, whenever you’re ready.</span></div>' +
+    '</div>' +
+    '<ul class="hl">' + six + '</ul>' +
+    (SHOW_LEAD ? '' : '<div class="dim" style="line-height:1.55;font-size:13px;margin-top:10px"><b style="color:var(--text)">Share</b> is a little different: it’s always open, so it never shows as taken or not yet. Tap it any time to invite someone.</div>') +
+    '<div style="display:flex;justify-content:flex-end;margin-top:14px"><button class="btn g" onclick="closeSheet()">Close</button></div>';
+  $('sheetOv').classList.add('open');
+}
+async function sendNote(kind) {
+  if (S.preview) return;
+  const text = ($('noteTxt') || {}).value || '', b = $('noteBtn');
+  if (!text.trim()) return;
+  b.disabled = true; b.textContent = 'Sending…';
+  const r = await api({ action: 'jr_note', token: tokenGet(), kind: kind, text: text }, 1);
+  if (r.ok) { closeSheet(); toast(kind === 'prayer' ? 'Your request has been sent. Thank you for sharing it with us.' : 'Sent. Thank you!'); }
+  else { b.disabled = false; b.textContent = 'Send'; toast(r.error || 'That didn’t send — please try again.'); }
+}
+async function logout() { meCacheClear(); await api({ action: 'jr_logout', token: tokenGet() }, 1); tokenSet(''); S.data = null; S.rendered = false; viewSignin(); tellParent(); }
+// Signed-in state for the dashboard (so it can label the tab).
+// ── the member app: "Add to Home Screen" (manifest: /journey/manifest.webmanifest, service worker: /sw.js) ──
+// Android/Chrome hands us an install prompt; iPhone needs Share → Add to Home Screen. Installed apps on
+// iPhone keep their own storage, so people sign in once more inside the app (the 90-day token then lives there).
+let _appPrompt = null;
+const APP_SNOOZE = 'lssr_app_snooze';
+function appStandalone() { return matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; }
+function appIsIOS() { return /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
+function appIsPhone() { return /iphone|ipad|ipod|android/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && Math.min(screen.width, screen.height) < 820); }
+function appCard() {
+  const el = $('jrApp'); if (!el) return;
+  let snoozed = false; try { snoozed = Number(localStorage.getItem(APP_SNOOZE) || 0) > Date.now(); } catch (e) {}
+  if (EMBED || S.preview || appStandalone() || snoozed || !appIsPhone() || !(_appPrompt || appIsIOS())) { el.innerHTML = ''; return; }
+  const share = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Share"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M5 11v9h14v-9"/></svg>';
+  el.innerHTML = '<div class="getapp"><img src="/assets/app/icon-192.png" alt=""><div><b>Get the Living Stones app</b>' +
+    (_appPrompt ? '<p>One tap puts this page on your home screen — it opens full-screen, and you stay signed in.</p>' +
+                  '<div class="acts"><button class="btn p sm" onclick="appInstall()">Add to Home Screen</button><button class="btn g sm" onclick="appSnooze()">Not now</button></div>'
+                : '<p>Tap ' + share + ' <b style="display:inline;font-size:inherit">Share</b> at the bottom of Safari, then <b style="display:inline;font-size:inherit">Add to Home Screen</b>. Open it from your home screen and sign in once more — then you’re set.</p>' +
+                  '<div class="acts"><button class="btn g sm" onclick="appSnooze()">Not now</button></div>') +
+    '</div></div>';
+}
+async function appInstall() {
+  const p = _appPrompt; _appPrompt = null; if (!p) return appCard();
+  try { p.prompt(); const c = await p.userChoice; if (c && c.outcome === 'dismissed') appSnooze(7); else appCard(); } catch (e) { appCard(); }
+}
+function appSnooze(days) { try { localStorage.setItem(APP_SNOOZE, String(Date.now() + (days || 30) * 864e5)); } catch (e) {} appCard(); }
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); _appPrompt = e; appCard(); });
+window.addEventListener('appinstalled', () => { _appPrompt = null; appCard(); toast('Added — find Living Stones on your home screen.'); });
+
+function tellParent() { if (EMBED && !S.preview) { try { parent.postMessage({ jrSignedIn: !!tokenGet(), jrFirst: (S.data && S.data.person && String(S.data.person.first).split(' ')[0]) || '' }, location.origin); } catch (e) {} } }
+
+// ── start ────────────────────────────────────────────────────────────────────
+const EMBED = new URLSearchParams(location.search).get('embed') === '1';
+if (appStandalone()) document.documentElement.classList.add('standalone');
+if (!EMBED && 'serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost'))
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+// The dashboard's Sign out ends this session too.
+function extLogout() { meCacheClear(); tokenSet(''); S.data = null; S.rendered = false; viewSignin(); tellParent(); }
+window.addEventListener('message', e => { if (e.origin === location.origin && e.data && e.data.jrLogout) extLogout(); });
+if (EMBED) document.body.classList.add('embed');
+if (!EMBED) document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('sheetOv').classList.contains('open')) closeSheet(); });
+if (EMBED) document.addEventListener('keydown', e => { if (e.key !== 'Escape') return; if ($('sheetOv').classList.contains('open')) { closeSheet(); e.stopImmediatePropagation(); } else if (paneOpen()) { closePane(); e.stopImmediatePropagation(); } }, true);
+(async function start() {
+  const q = new URLSearchParams(location.search), h = new URLSearchParams(location.hash.replace(/^#/, ''));
+  if (q.get('preview') && h.get('k')) {                     // pastor preview (from the Shepherding drawer)
+    S.preview = q.get('preview').replace(/\D/g, ''); S.pw = h.get('k');
+    history.replaceState(null, '', location.pathname + '?preview=' + S.preview);   // drop the key from the address bar
+    return loadMe();
+  }
+  if (q.get('m')) {                                         // one-tap link from the sign-in email
+    $('app').innerHTML = '<div class="loading">Signing you in…</div>';
+    const r = await api({ action: 'jr_magic', m: q.get('m') }, 1);
+    history.replaceState(null, '', location.pathname);
+    if (r.ok && r.token) { tokenSet(r.token); return loadMe(); }
+    S.cfg = (await api({ action: 'jr_config' })) || {}; return viewSignin(r.error);
+  }
+  if (q.get('code') && q.get('state')) {                    // back from "Sign in with Planning Center"
+    $('app').innerHTML = '<div class="loading">Finishing sign-in…</div>';
+    const r = await api({ action: 'jr_oauth_finish', code: q.get('code'), state: q.get('state') }, 1);
+    history.replaceState(null, '', location.pathname);
+    if (r.ok && r.token) { tokenSet(r.token); return loadMe(); }
+    S.cfg = (await api({ action: 'jr_config' })) || {}; return viewSignin(r.error);
+  }
+  if (tokenGet()) return loadMe();
+  const known = cfgCached();
+  if (known) { S.cfg = known; viewSignin(); api({ action: 'jr_config' }).then(c => { if (c && c.ok) { cfgSave(c); S.cfg = c; } }); return; }   // instant sign-in screen, refreshed quietly
+  const slow = slowNote('#app', 'Loading… one moment.');
+  const cfg = await api({ action: 'jr_config' });
+  clearTimeout(slow);
+  cfgSave(cfg);
+  S.cfg = cfg && cfg.ok ? cfg : { channel: 'email' };
+  viewSignin();
+})();
+</script>
+</body>
+</html>
